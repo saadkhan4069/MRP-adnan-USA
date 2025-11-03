@@ -444,22 +444,6 @@
             color: #1565c0;
         }
 
-        .customer-info-box {
-            background: var(--hover-bg);
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 8px;
-            display: none;
-        }
-
-        .customer-info-box.active {
-            display: block;
-        }
-
-        .customer-info-box p {
-            margin: 4px 0;
-            font-size: 0.9rem;
-        }
 
         @media (max-width: 768px) {
             .booking-layout {
@@ -552,18 +536,11 @@
                                 <select class="form-select" id="customerId" name="customer_id" required>
                                     <option value="">-- Select Customer --</option>
                                     <?php foreach($customers as $customer): ?>
-                                    <option value="<?php echo $customer->id; ?>" 
-                                            data-phone="<?php echo $customer->phone_number; ?>" 
-                                            data-email="<?php echo $customer->email; ?>">
+                                    <option value="<?php echo $customer->id; ?>">
                                         <?php echo htmlspecialchars($customer->name); ?>
                                     </option>
                                     <?php endforeach; ?>
                                 </select>
-                                
-                                <div class="customer-info-box" id="customerInfoBox">
-                                    <p><strong>Phone:</strong> <span id="customerPhone"></span></p>
-                                    <p><strong>Email:</strong> <span id="customerEmail"></span></p>
-                                </div>
                             </div>
                             
                             <div class="col-md-6 mb-3">
@@ -581,6 +558,19 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" 
+                                       placeholder="Enter phone number" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="Enter email address" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="paymentMode" class="form-label">Payment Mode *</label>
                                 <select class="form-select" id="paymentMode" name="payment_mode" required>
                                     <option value="">-- Select Payment Mode --</option>
@@ -591,7 +581,8 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="insurance" class="form-label">Insurance</label>
-                                <input type="text" class="form-control" id="insurance" name="insurance">
+                                <input type="text" class="form-control" id="insurance" name="insurance" 
+                                       placeholder="Enter insurance details">
                             </div>
                         </div>
 
@@ -632,16 +623,7 @@
             }
         });
 
-        $('#customerId').change(function() {
-            const selectedOption = $(this).find('option:selected');
-            if (selectedOption.val()) {
-                $('#customerPhone').text(selectedOption.data('phone'));
-                $('#customerEmail').text(selectedOption.data('email'));
-                $('#customerInfoBox').addClass('active');
-            } else {
-                $('#customerInfoBox').removeClass('active');
-            }
-        });
+        // Customer selection - no auto-fill (patient enters own phone/email)
 
         function renderCalendar() {
             const year = currentDate.getFullYear();
@@ -849,7 +831,6 @@
                     if (response.success) {
                         $('#formSuccess').html('<i class="fas fa-check-circle"></i> ' + response.message + '<br><small>The selected time slot is now disabled and unavailable for others.</small>').show();
                         form.reset();
-                        $('#customerInfoBox').removeClass('active');
                         
                         setTimeout(function() {
                             bootstrap.Modal.getInstance($('#bookingModal')[0]).hide();

@@ -141,7 +141,10 @@
                         <tr>
                             <td><?php echo date('M d, Y', strtotime($appointment->appointment_date)); ?></td>
                             <td><i class="far fa-clock"></i> <?php echo $appointment->slot; ?></td>
-                            <td><?php echo htmlspecialchars($appointment->first_name . ' ' . $appointment->last_name); ?></td>
+                            <td>
+                                <strong><?php echo htmlspecialchars($appointment->customer->name ?? $appointment->first_name); ?></strong>
+                                <br><small class="text-muted">Phone: <?php echo htmlspecialchars($appointment->phone); ?></small>
+                            </td>
                             <td><?php echo htmlspecialchars($appointment->department); ?></td>
                             <td>
                                 <?php

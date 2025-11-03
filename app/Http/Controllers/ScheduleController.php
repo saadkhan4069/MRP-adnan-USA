@@ -79,6 +79,8 @@ class ScheduleController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
             'department_id' => 'required|exists:departments,id',
+            'phone' => 'required|string|max:20',
+            'email' => 'required|email|max:255',
             'payment_mode' => 'required|in:cash,card,bank',
             'insurance' => 'nullable|string|max:255',
             'appointment_date' => 'required|date|after_or_equal:today',
@@ -108,18 +110,20 @@ class ScheduleController extends Controller
             ], 400);
         }
 
-        // Get customer details
+        // Get customer and department details
         $customer = \App\Models\Customer::find($request->customer_id);
         $department = \App\Models\Department::find($request->department_id);
         
         $slots = Appointment::getTimeSlots();
         $slot = $slots[$request->appointment_time] ?? '';
 
+        // Create appointment with user-entered phone and email
         $appointment = Appointment::create([
+            'customer_id' => $request->customer_id,  // Customer ID for tracking
             'first_name' => $customer->name ?? 'N/A',
             'last_name' => '',
-            'phone' => $customer->phone_number ?? '',
-            'email' => $customer->email ?? '',
+            'phone' => $request->phone,  // User entered
+            'email' => $request->email,  // User entered
             'customer_type' => 'customer',
             'department' => $department->name ?? '',
             'payment_mode' => $request->payment_mode,
@@ -139,7 +143,7 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Display user's own appointments
+     * Display user's own appointments (based on their customers)
      */
     public function userAppointments()
     {
@@ -147,8 +151,14 @@ class ScheduleController extends Controller
             return redirect()->route('login');
         }
 
-        $appointments = Appointment::where('user_id', Auth::id())
-            ->orWhere('email', Auth::user()->email)
+        // Get customer IDs that belong to this user
+        $customerIds = \App\Models\Customer::where('user_id', Auth::id())
+            ->pluck('id')
+            ->toArray();
+
+        // Get appointments for user's customers
+        $appointments = Appointment::with('customer')
+            ->whereIn('customer_id', $customerIds)
             ->orderBy('appointment_date', 'desc')
             ->orderBy('appointment_time', 'desc')
             ->paginate(15);
@@ -164,10 +174,14 @@ class ScheduleController extends Controller
         $appointment = Appointment::findOrFail($id);
 
         // Check if user has permission to reschedule
-        if (!Auth::check() || (Auth::id() !== $appointment->user_id && !Auth::user()->is_admin)) {
+        // User can reschedule if the appointment's customer belongs to them OR if they are admin
+        $userCustomerIds = \App\Models\Customer::where('user_id', Auth::id())->pluck('id')->toArray();
+        $isAdmin = Auth::check() && Auth::user()->role_id <= 2;
+        
+        if (!Auth::check() || (!in_array($appointment->customer_id, $userCustomerIds) && !$isAdmin)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized - You can only reschedule your own customer appointments'
             ], 403);
         }
 
@@ -229,10 +243,14 @@ class ScheduleController extends Controller
         $appointment = Appointment::findOrFail($id);
 
         // Check if user has permission to cancel
-        if (!Auth::check() || (Auth::id() !== $appointment->user_id && !Auth::user()->is_admin)) {
+        // User can cancel if the appointment's customer belongs to them OR if they are admin
+        $userCustomerIds = \App\Models\Customer::where('user_id', Auth::id())->pluck('id')->toArray();
+        $isAdmin = Auth::check() && Auth::user()->role_id <= 2;
+        
+        if (!Auth::check() || (!in_array($appointment->customer_id, $userCustomerIds) && !$isAdmin)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized - You can only cancel your own customer appointments'
             ], 403);
         }
 
@@ -249,11 +267,11 @@ class ScheduleController extends Controller
      */
     public function adminAppointments()
     {
-        // if (!Auth::check() || !Auth::user()->is_admin) {
-        //     abort(403, 'Unauthorized');
-        // }
+        if (!Auth::check() || Auth::user()->role_id > 2) {
+            abort(403, 'Unauthorized - Admin access required');
+        }
 
-        $appointments = Appointment::with(['user', 'creator'])
+        $appointments = Appointment::with(['customer', 'user', 'creator'])
             ->orderBy('appointment_date', 'desc')
             ->orderBy('appointment_time', 'desc')
             ->paginate(20);
@@ -266,10 +284,10 @@ class ScheduleController extends Controller
      */
     public function updateStatus(Request $request, $id)
     {
-        if (!Auth::check() || !Auth::user()->is_admin) {
+        if (!Auth::check() || Auth::user()->role_id > 2) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized - Admin access required'
             ], 403);
         }
 
@@ -300,10 +318,10 @@ class ScheduleController extends Controller
      */
     public function destroy($id)
     {
-        if (!Auth::check() || !Auth::user()->is_admin) {
+        if (!Auth::check() || Auth::user()->role_id > 2) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized - Admin access required'
             ], 403);
         }
 

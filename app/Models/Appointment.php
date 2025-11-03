@@ -11,6 +11,7 @@ class Appointment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'customer_id',
         'first_name',
         'last_name',
         'phone',
@@ -32,6 +33,14 @@ class Appointment extends Model
         'appointment_date' => 'date',
         'appointment_time' => 'datetime',
     ];
+
+    /**
+     * Get the customer associated with the appointment
+     */
+    public function customer()
+    {
+        return $this->belongsTo(\App\Models\Customer::class, 'customer_id');
+    }
 
     /**
      * Get the user who owns the appointment
