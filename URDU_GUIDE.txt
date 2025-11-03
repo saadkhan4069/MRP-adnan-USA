@@ -1,0 +1,257 @@
+===============================================
+SCHEDULE MODULE - URDU/HINDI GUIDE
+===============================================
+
+📅 APPOINTMENT SCHEDULING MODULE TAYYAR HAI!
+===============================================
+
+Module ka naam: Appointment Scheduling System
+Purpose: Patients ke liye appointment booking ka system
+
+===============================================
+LINKS (ZARURI)
+===============================================
+
+1. PUBLIC BOOKING PAGE
+   Link: http://your-domain.com/schedule/booking
+   
+   Ye page PUBLIC hai - koi bhi dekh sakta hai
+   Is page par:
+   - Calendar dikhega (Google Calendar jaisa)
+   - Date select karen
+   - Time slot select karen (8 AM se 4 PM tak)
+   - Form bhar ke submit karen
+   - Saturday/Sunday band honge
+   - Jo slots booked hain wo DARK/DISABLED dikhengi
+
+2. USER PORTAL
+   Link: http://your-domain.com/schedule/my-appointments
+   
+   Login zaruri hai
+   Is page par user:
+   - Apni appointments dekh sakta hai
+   - Reschedule kar sakta hai
+   - Cancel kar sakta hai
+   - Details dekh sakta hai
+
+3. ADMIN PANEL
+   Link: http://your-domain.com/schedule/admin
+   
+   Admin login zaruri hai
+   Is page par admin:
+   - Sab appointments dekh sakta hai
+   - Status change kar sakta hai
+   - Delete kar sakta hai
+   - Export kar sakta hai (CSV, Excel)
+   - Statistics dekh sakta hai
+
+===============================================
+INSTALLATION (Setup kaise karen)
+===============================================
+
+1. Migration run karen:
+   Command: php artisan migrate
+
+2. Cache clear karen (optional):
+   php artisan cache:clear
+   php artisan config:clear
+   php artisan route:clear
+
+3. Browser me ja kar test karen:
+   http://your-domain.com/schedule/booking
+
+===============================================
+FEATURES (Kya-kya hai is module me)
+===============================================
+
+✅ Public booking calendar - Google Calendar jaisa design
+✅ Time slots: Subah 8 baje se sham 4 baje tak (har slot 1 ghante ka)
+✅ Saturday/Sunday automatically OFF hote hain
+✅ Public holidays OFF kar sakte hain
+✅ Jo slot book ho jaye wo dark/disabled ho jata hai
+✅ User apni appointments manage kar sakta hai
+✅ Admin sab appointments dekh aur manage kar sakta hai
+✅ Status change kar sakte hain (pending/confirmed/cancelled/completed)
+✅ Mobile friendly - phone pe bhi chalta hai
+
+===============================================
+BOOKING FORM ME KYA BHARNA HAI
+===============================================
+
+Jab koi appointment book karega to ye information chahiye:
+
+1. First Name (Zaruri)
+2. Last Name (Zaruri)
+3. Phone Number (Zaruri)
+4. Email (Zaruri)
+5. User/Customer (Zaruri) - Dropdown me select kare
+6. Department (Zaruri)
+7. Payment Mode (Zaruri) - Cash/Card/Bank me se select kare
+8. Insurance (Optional - bharna zaruri nahi)
+
+===============================================
+TIME SLOTS (Timing)
+===============================================
+
+Ye timings available hain (1-1 ghante ki slots):
+
+- 8:00 AM - 9:00 AM
+- 9:00 AM - 10:00 AM
+- 10:00 AM - 11:00 AM
+- 11:00 AM - 12:00 PM
+- 12:00 PM - 1:00 PM
+- 1:00 PM - 2:00 PM
+- 2:00 PM - 3:00 PM
+- 3:00 PM - 4:00 PM
+
+Note: Saturday aur Sunday OFF rahenge
+
+===============================================
+PUBLIC HOLIDAYS ADD KAISE KAREN
+===============================================
+
+File: app/Models/Appointment.php
+Function: isWorkingDay()
+
+Is function me ja kar ye add karen:
+
+$publicHolidays = [
+    '2025-12-25', // Christmas
+    '2025-01-01', // New Year
+    '2025-03-23', // Pakistan Day
+    // Aur holidays add kar sakte hain
+];
+
+===============================================
+KAISE USE KARE (USER KE LIYE)
+===============================================
+
+PUBLIC BOOKING:
+1. Link kholen: http://your-domain.com/schedule/booking
+2. Calendar me se date select karen (Saturday/Sunday nahi)
+3. Time slot par click karen
+4. Form bhar kar submit karen
+5. Success message aayega
+
+USER PORTAL:
+1. Pehle login karen
+2. Link kholen: http://your-domain.com/schedule/my-appointments
+3. Apni sari appointments dikhengi
+4. Reschedule button se date/time change kar sakte hain
+5. Cancel button se cancel kar sakte hain
+
+ADMIN PANEL:
+1. Admin ke taur par login karen
+2. Link kholen: http://your-domain.com/schedule/admin
+3. Sari appointments dikhengi
+4. Status dropdown se status change kar sakte hain
+5. Edit button se reschedule kar sakte hain
+6. Delete button se delete kar sakte hain
+7. Export buttons se data download kar sakte hain
+
+===============================================
+FILES KA LOCATION
+===============================================
+
+Database Table: appointments (automatically ban jayegi)
+
+Code Files:
+- Migration: database/migrations/2025_11_03_000001_create_appointments_table.php
+- Model: app/Models/Appointment.php
+- Controller: app/Http/Controllers/ScheduleController.php
+- Views: resources/views/schedule/
+  * public-booking.php (public page)
+  * user-appointments.php (user portal)
+  * admin-appointments.php (admin panel)
+- Routes: routes/web.php (schedule routes add ho gayi hain)
+
+===============================================
+TROUBLESHOOTING (Problems aur Solutions)
+===============================================
+
+Problem: Page nahi khul raha
+Solution: 
+- Cache clear karen: php artisan cache:clear
+- Routes check karen: php artisan route:list | grep schedule
+
+Problem: Admin panel me access nahi
+Solution:
+- Make sure aap admin account se login hain
+- ScheduleController.php me admin check modify karen agar zarurat ho
+
+Problem: Slots load nahi ho rahe
+Solution:
+- Browser console check karen (F12 press karen)
+- Database connection check karen
+- CSRF token check karen
+
+Problem: Migration error aa raha hai
+Solution:
+- Table already exist ho sakti hai
+- Database check karen
+- Agar table already hai to migration skip kar sakte hain
+
+===============================================
+IMPORTANT NOTES
+===============================================
+
+1. Database me 'appointments' table ban jayegi
+2. Users table pehle se honi chahiye
+3. Admin check ke liye is_admin column use hota hai
+   (agar different system hai to ScheduleController.php me change karen)
+4. JavaScript zaruri hai (browser me enable honi chahiye)
+5. CSRF protection enabled hai
+6. Mobile friendly hai
+
+===============================================
+MENU ME LINK KAISE ADD KAREN
+===============================================
+
+Apni application ke navigation menu me ye links add kar sakte hain:
+
+For Everyone:
+<a href="{{ route('schedule.public') }}">Appointment Booking</a>
+
+For Logged In Users:
+<a href="{{ route('schedule.user-appointments') }}">My Appointments</a>
+
+For Admin:
+<a href="{{ route('schedule.admin') }}">Manage Appointments</a>
+
+===============================================
+TESTING CHECKLIST
+===============================================
+
+Test karne ke liye ye sab check karen:
+
+□ Public booking page khul raha hai
+□ Calendar dikh raha hai
+□ Weekends disabled hain
+□ Time slots load ho rahe hain
+□ Form submit ho raha hai
+□ Booked slots disabled dikh rahe hain
+□ User portal me appointments dikh rahi hain
+□ Reschedule kaam kar raha hai
+□ Cancel kaam kar raha hai
+□ Admin panel me sab appointments dikh rahi hain
+□ Status change ho raha hai
+□ Delete kaam kar raha hai
+
+===============================================
+QUESTIONS? PROBLEMS?
+===============================================
+
+Agar koi problem hai to:
+1. Laravel logs check karen: storage/logs/laravel.log
+2. Browser console check karen (F12 press karen)
+3. Database connection verify karen
+4. Routes verify karen
+
+Module successfully ban gaya hai aur ready hai!
+
+===============================================
+Created By: AI Assistant
+Date: November 3, 2025
+Version: 1.0
+===============================================
+
