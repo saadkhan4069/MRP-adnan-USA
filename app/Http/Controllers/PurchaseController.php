@@ -60,7 +60,10 @@ class PurchaseController extends Controller
     public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('purchases-index')) {
+        $roleName = $role?->name;
+        $isCustomer = Auth::user()->role_id == 5 || (is_string($roleName) && strtolower($roleName) === 'customer');
+
+        if($role && ($role->hasPermissionTo('purchases-index') || $isCustomer)) {
             if($request->input('warehouse_id'))
                 $warehouse_id = $request->input('warehouse_id');
             else
@@ -84,9 +87,22 @@ class PurchaseController extends Controller
                 $starting_date = date("Y-m-d", strtotime(date('Y-m-d', strtotime('-1 year', strtotime(date('Y-m-d') )))));
                 $ending_date = date("Y-m-d");
             }
-            $permissions = Role::findByName($role->name)->permissions;
-            foreach ($permissions as $permission)
-                $all_permission[] = $permission->name;
+            $all_permission = [];
+            if($role->hasPermissionTo('purchases-index')) {
+                $permissions = Role::findByName($role->name)->permissions;
+                foreach ($permissions as $permission) {
+                    $all_permission[] = $permission->name;
+                }
+            }
+
+            if($isCustomer) {
+                // Allow customer to access create/list without needing spatie permissions
+                $all_permission[] = 'purchases-index';
+                $all_permission[] = 'purchases-add';
+            }
+
+            $all_permission = array_unique($all_permission);
+
             if(empty($all_permission))
                 $all_permission[] = 'dummy text';
             $lims_pos_setting_data = PosSetting::select('stripe_public_key')->latest()->first();
@@ -101,7 +117,7 @@ class PurchaseController extends Controller
             foreach($custom_fields as $fieldName) {
                 $field_name[] = str_replace(" ", "_", strtolower($fieldName));
             }
-              return view('backend.purchase.index', compact( 'lims_account_list', 'lims_warehouse_list', 'lims_production_list', 'all_permission', 'lims_pos_setting_data', 'warehouse_id', 'starting_date', 'ending_date', 'purchase_status', 'payment_status', 'custom_fields', 'field_name'));
+              return view('backend.purchase.index', compact( 'lims_account_list', 'lims_warehouse_list', 'lims_production_list', 'all_permission', 'lims_pos_setting_data', 'warehouse_id', 'starting_date', 'ending_date', 'purchase_status', 'payment_status', 'custom_fields', 'field_name', 'isCustomer'));
         }
         else
          return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
@@ -1088,9 +1104,28 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
     public function create()
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('purchases-add')){
+        $roleName = $role?->name;
+        $isCustomer = Auth::user()->role_id == 5 || (is_string($roleName) && strtolower($roleName) === 'customer');
+
+        if($role && ($role->hasPermissionTo('purchases-add') || $isCustomer)){
             $lims_supplier_list = Supplier::where('is_active', true)->get();
-             $lims_customer_list = Customer::with('user')->get();
+            $customerForUser = null;
+
+            if($isCustomer) {
+                $customerForUser = Customer::with('user')
+                    ->where('user_id', Auth::id())
+                    ->first();
+
+                $lims_customer_list = collect();
+                if($customerForUser) {
+                    $lims_customer_list = collect([$customerForUser]);
+                }
+            } else {
+                $lims_customer_list = Customer::with('user')->get();
+            }
+
+            $lims_production_list = collect();
+
             if(Auth::user()->role_id > 2) 
             {
                 $lims_customer_list = Customer::with('user')
@@ -1116,7 +1151,7 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         $lims_product_list_with_variant = $this->productWithVariant();
         $currency_list = Currency::where('is_active', true)->get();
         $custom_fields = CustomField::where('belongs_to', 'purchase')->get();
-            return view('backend.purchase.create', compact('lims_customer_list','lims_supplier_list', 'lims_warehouse_list','lims_production_list', 'lims_tax_list', 'lims_product_list_without_variant', 'lims_product_list_with_variant', 'currency_list', 'custom_fields'));
+            return view('backend.purchase.create', compact('lims_customer_list','lims_supplier_list', 'lims_warehouse_list','lims_production_list', 'lims_tax_list', 'lims_product_list_without_variant', 'lims_product_list_with_variant', 'currency_list', 'custom_fields', 'customerForUser', 'isCustomer'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
@@ -1188,9 +1223,27 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
 
     try {
         $data = $request->except('document');
-        $data['user_id'] = $data['customer_id'];
-        if (empty($data['customer_id'])) {
-            $data['user_id'] = Auth::id();
+        $currentUser = Auth::user();
+        $customerModel = null;
+
+        if (!empty($data['customer_id'])) {
+            $customerModel = Customer::find($data['customer_id']);
+        }
+
+        if ($currentUser->role_id == 5) {
+            // Force current customer's ID
+            $customerModel = Customer::where('user_id', $currentUser->id)->first();
+            if (!$customerModel) {
+                return redirect()->back()->with('not_permitted', 'No customer profile linked with your account.')->withInput();
+            }
+            $data['customer_id'] = $customerModel->id;
+            $data['user_id'] = $currentUser->id;
+        } else {
+            if ($customerModel) {
+                $data['user_id'] = $customerModel->user_id ?? $currentUser->id;
+            } else {
+                $data['user_id'] = $currentUser->id;
+            }
         }
 
         if (!isset($data['reference_no'])) {
@@ -2073,9 +2126,18 @@ private function imeiExists(string $imei, int $productId): bool
         $purchase_status = $request->input('purchase_status');
         $payment_status = $request->input('payment_status');
 
+        $isCustomer = Auth::user()->role_id == 5;
+        $customerIdsForUser = [];
+        if ($isCustomer) {
+            $customerIdsForUser = Customer::where('user_id', Auth::id())->pluck('id')->toArray();
+        }
+
         $q = Purchase::whereDate('created_at', '>=' ,$request->input('starting_date'))->whereDate('created_at', '<=' ,$request->input('ending_date'));
         //check staff access
         $this->staffAccessCheck($q);
+        if ($isCustomer) {
+            $q = $q->whereIn('customer_id', $customerIdsForUser);
+        }
         if($warehouse_id)
             $q = $q->where('warehouse_id', $warehouse_id);
         if($purchase_status)
@@ -2115,6 +2177,9 @@ private function imeiExists(string $imei, int $productId): bool
                 ->orderBy($order, $dir);
 
             $this->staffAccessCheck($q);
+            if ($isCustomer) {
+                $q = $q->whereIn('customer_id', $customerIdsForUser);
+            }
             if($warehouse_id)
                 $q = $q->where('warehouse_id', $warehouse_id);
             if($purchase_status)
@@ -2190,6 +2255,9 @@ private function imeiExists(string $imei, int $productId): bool
                     ->orwhere('purchases.po_no', 'LIKE', "%{$search}%")
                     ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
                     ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+                if ($isCustomer) {
+                    $q = $q->whereIn('purchases.customer_id', $customerIdsForUser);
+                }
                 foreach ($field_names as $key => $field_name) {
                     $q = $q->orwhere('purchases.' . $field_name, 'LIKE', "%{$search}%");
                 }

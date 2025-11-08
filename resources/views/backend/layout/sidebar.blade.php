@@ -43,15 +43,16 @@
             @endif
             <?php
                 $index_permission_active = $role_has_permissions_list->where('name', 'purchases-index')->first();
+            $isCustomerRole = Auth::check() && Auth::user()->role_id == 5;
             ?>
-            @if($index_permission_active)
+            @if($index_permission_active || $isCustomerRole)
             <li><a href="#purchase" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-card"></i><span>{{__('db.Purchase')}}</span></a>
             <ul id="purchase" class="collapse list-unstyled ">
                 <li id="purchase-list-menu"><a href="{{route('purchases.index')}}">{{__('db.Purchase List')}}</a></li>
                 <?php
                 $add_permission_active = $role_has_permissions_list->where('name', 'purchases-add')->first();
                 ?>
-                @if($add_permission_active)
+                @if($add_permission_active || $isCustomerRole)
                 <li id="purchase-create-menu"><a href="{{route('purchases.create')}}">{{__('db.Add Purchase')}}</a></li>
                 <li id="purchase-import-menu"><a href="{{url('purchases/purchase_by_csv')}}">{{__('db.Import Purchase By CSV')}}</a></li>
 

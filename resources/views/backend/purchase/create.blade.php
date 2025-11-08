@@ -107,16 +107,27 @@
               <div class="col-md-4">
                 <div class="form-group">
                   <label>Customer *</label>
-                  <select name="customer_id"
-                    class="selectpicker form-control @error('customer_id') is-invalid @enderror"
-                    data-live-search="true" title="Select Customer..." required>
-                    @foreach($lims_customer_list as $customer)
-                      <option value="{{ $customer->id }}" {{ old('customer_id') == $customer->id ? 'selected' : '' }}>
-                        {{ $customer->name .' ('. $customer->company_name .')' }}
-                      </option>
-                    @endforeach
-                  </select>
-                  @error('customer_id') <small class="text-danger d-block">{{ $message }}</small> @enderror
+                  @if(!empty($isCustomer) && $isCustomer)
+                    @php
+                      $customerOption = $customerForUser ?? $lims_customer_list->first();
+                    @endphp
+                    <input type="hidden" name="customer_id" value="{{ $customerOption?->id }}">
+                    <input type="text" class="form-control" value="{{ $customerOption?->name ?? 'Customer' }}" disabled>
+                    @if(!$customerOption)
+                      <small class="text-danger d-block">No customer profile linked to your account. Please contact support.</small>
+                    @endif
+                  @else
+                    <select name="customer_id"
+                      class="selectpicker form-control @error('customer_id') is-invalid @enderror"
+                      data-live-search="true" title="Select Customer..." required>
+                      @foreach($lims_customer_list as $customer)
+                        <option value="{{ $customer->id }}" {{ old('customer_id') == $customer->id ? 'selected' : '' }}>
+                          {{ $customer->name .' ('. $customer->company_name .')' }}
+                        </option>
+                      @endforeach
+                    </select>
+                    @error('customer_id') <small class="text-danger d-block">{{ $message }}</small> @enderror
+                  @endif
                 </div>
               </div>
 
