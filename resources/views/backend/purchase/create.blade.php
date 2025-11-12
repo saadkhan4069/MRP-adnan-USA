@@ -70,7 +70,7 @@
                   <label>{{ __('db.date') }}</label>
                   <input type="text" name="created_at"
                     class="form-control date @error('created_at') is-invalid @enderror"
-                    value="{{ old('created_at') }}" placeholder="{{ __('db.Choose date') }}">
+                    value="{{ old('created_at', \Carbon\Carbon::now()->format('Y-m-d')) }}" placeholder="{{ __('db.Choose date') }}">
                   @error('created_at') <small class="text-danger">{{ $message }}</small> @enderror
                 </div>
               </div>
@@ -90,11 +90,17 @@
               <div class="col-md-4" id="select1">
                 <div class="form-group">
                   <label>{{ __('Warehouse / Production') }} *</label>
+                  @php
+                    $defaultWarehouseId = old('warehouse_id');
+                    if(!$defaultWarehouseId && $lims_warehouse_list->count() === 1) {
+                      $defaultWarehouseId = $lims_warehouse_list->first()->id;
+                    }
+                  @endphp
                   <select name="warehouse_id"
                     class="selectpicker form-control @error('warehouse_id') is-invalid @enderror"
                     data-live-search="true" title="Select warehouse..." required>
                     @foreach($lims_warehouse_list as $warehouse)
-                      <option value="{{ $warehouse->id }}" {{ old('warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                      <option value="{{ $warehouse->id }}" {{ $defaultWarehouseId == $warehouse->id ? 'selected' : '' }}>
                         {{ $warehouse->company }}
                       </option>
                     @endforeach
@@ -103,30 +109,52 @@
                 </div>
               </div>
 
-              {{-- Customer (fixed duplicate name attr) --}}
+              {{-- Customer --}}
               <div class="col-md-4">
                 <div class="form-group">
                   <label>Customer *</label>
-                  @if(!empty($isCustomer) && $isCustomer)
-                    @php
-                      $customerOption = $customerForUser ?? $lims_customer_list->first();
-                    @endphp
-                    <input type="hidden" name="customer_id" value="{{ $customerOption?->id }}">
-                    <input type="text" class="form-control" value="{{ $customerOption?->name ?? 'Customer' }}" disabled>
-                    @if(!$customerOption)
-                      <small class="text-danger d-block">No customer profile linked to your account. Please contact support.</small>
-                    @endif
+                  @php
+                    $customerOption = null;
+                    if(isset($customerForUser) && $customerForUser){
+                      $customerOption = $customerForUser;
+                    } elseif(isset($lims_customer_list) && $lims_customer_list->count()) {
+                      $customerOption = $lims_customer_list->first();
+                    }
+                    $selectedCustomerId = old('customer_id', $customerOption?->id);
+                  @endphp
+                  @if(!empty($isCustomer) && $isCustomer && empty($customerForUser))
+                    <div class="alert alert-warning p-2 mb-0">
+                      No customer profile linked to your account. Please contact support.
+                    </div>
                   @else
-                    <select name="customer_id"
-                      class="selectpicker form-control @error('customer_id') is-invalid @enderror"
-                      data-live-search="true" title="Select Customer..." required>
-                      @foreach($lims_customer_list as $customer)
-                        <option value="{{ $customer->id }}" {{ old('customer_id') == $customer->id ? 'selected' : '' }}>
-                          {{ $customer->name .' ('. $customer->company_name .')' }}
-                        </option>
-                      @endforeach
-                    </select>
-                    @error('customer_id') <small class="text-danger d-block">{{ $message }}</small> @enderror
+                    @if(!empty($isCustomer) && $isCustomer)
+                      <input type="hidden" name="customer_id" value="{{ $selectedCustomerId }}">
+                      <select name="customer_id_display"
+                        class="selectpicker form-control customer-locked"
+                        data-live-search="false"
+                        title="Customer"
+                        disabled>
+                        @foreach($lims_customer_list as $customer)
+                          <option value="{{ $customer->id }}" {{ $selectedCustomerId == $customer->id ? 'selected' : '' }}>
+                            {{ $customer->name .' ('. $customer->company_name .')' }}
+                          </option>
+                        @endforeach
+                      </select>
+                      <small class="text-muted d-block mt-1">Linked customer is auto-selected.</small>
+                    @else
+                      <select name="customer_id"
+                        class="selectpicker form-control @error('customer_id') is-invalid @enderror"
+                        data-live-search="true"
+                        title="Select Customer..."
+                        required>
+                        @foreach($lims_customer_list as $customer)
+                          <option value="{{ $customer->id }}" {{ $selectedCustomerId == $customer->id ? 'selected' : '' }}>
+                            {{ $customer->name .' ('. $customer->company_name .')' }}
+                          </option>
+                        @endforeach
+                      </select>
+                      @error('customer_id') <small class="text-danger d-block">{{ $message }}</small> @enderror
+                    @endif
                   @endif
                 </div>
               </div>
@@ -994,11 +1022,29 @@
   });
 
   // Client-side minimal guard; server will still validate and keep you on page
+  const isCustomerRole = {{ !empty($isCustomer) && $isCustomer ? 'true' : 'false' }};
+
   $('#purchase-form').on('submit', function (e) {
     let errors = [];
     if (!$('input[name="po_no"]').val().trim()) errors.push('PO Number is required.');
-    if (!$('select[name="warehouse_id"]').val()) errors.push('Warehouse is required.');
-    if (!$('select[name="customer_id"]').val()) errors.push('Customer is required.');
+    const warehouseField = $('select[name="warehouse_id"]');
+    const hasWarehouse = warehouseField.length ? !!warehouseField.val() : !!$('input[name="warehouse_id"]').val();
+    if (!hasWarehouse) errors.push('Warehouse is required.');
+    const customerSelect = $('select[name="customer_id"]');
+    let hasCustomer = false;
+    if (customerSelect.length) {
+      hasCustomer = !!customerSelect.val();
+    } else {
+      const hiddenCustomerInput = $('input[type="hidden"][name="customer_id"]').first();
+      if (hiddenCustomerInput.length) {
+        const hiddenValue = hiddenCustomerInput.val();
+        hasCustomer = hiddenValue !== undefined && hiddenValue !== null && hiddenValue !== '';
+      }
+    }
+    if (isCustomerRole) {
+      hasCustomer = true;
+    }
+    if (!hasCustomer) errors.push('Customer is required.');
     const rownumber = $('table.order-list tbody tr:last').index();
     if (rownumber < 0) errors.push('Please insert product to the order table.');
     if (errors.length) { e.preventDefault(); alert(errors.join('\n')); return false; }

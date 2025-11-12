@@ -1116,10 +1116,7 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
                     ->where('user_id', Auth::id())
                     ->first();
 
-                $lims_customer_list = collect();
-                if($customerForUser) {
-                    $lims_customer_list = collect([$customerForUser]);
-                }
+                $lims_customer_list = $customerForUser ? collect([$customerForUser]) : collect();
             } else {
                 $lims_customer_list = Customer::with('user')->get();
             }
@@ -1134,13 +1131,20 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
                 $query->where('role_id', Auth::user()->role_id);
                 })
                 ->get();
+                if($isCustomer) {
+                    $customerForUser = $lims_customer_list->first();
+                }
             }
 
             if(Auth::user()->role_id > 2) {
-                $lims_warehouse_list = Warehouse::where([
-                    ['is_active', true],
-                    ['id', Auth::user()->warehouse_id]
-                ])->get();
+                if(!empty(Auth::user()->warehouse_id)) {
+                    $lims_warehouse_list = Warehouse::where([
+                        ['is_active', true],
+                        ['id', Auth::user()->warehouse_id]
+                    ])->get();
+                } else {
+                    $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+                }
             }
             else {
                 $lims_warehouse_list = Warehouse::where('is_active', true)->get();
@@ -1275,12 +1279,8 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
             $data['document'] = $documentName;
         }
 
-        if (isset($data['created_at'])) {
-            $data['created_at'] = str_replace("/", "-", $data['created_at']);
-            $data['created_at'] = date("Y-m-d H:i:s", strtotime($data['created_at']));
-        } else {
-            $data['created_at'] = date("Y-m-d H:i:s");
-        }
+        $data['created_at'] = $this->normalizeDateTime($data['created_at'] ?? null);
+        $data['updated_at'] = $data['created_at'];
 
         $data['system_po_no'] = $this->generatePoNumber();
         $lims_purchase_data = Purchase::create($data);
@@ -1470,7 +1470,8 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         return redirect('purchases')->with('message', __('db.Purchase created successfully'));
     } catch (\Exception $e) {
         DB::rollBack();
-        return redirect('purchases/create')->with('not_permitted', 'Transaction failed: ' . $e->getMessage());
+        report($e);
+        return back()->withInput()->with('not_permitted', 'Transaction failed: ' . $e->getMessage());
     }
 }
 
@@ -1718,6 +1719,22 @@ protected function normalizeDateYmd(?string $s): ?string
         return Carbon::parse($s)->format('Y-m-d');
     } catch (\Exception $e) {
         return null;
+    }
+}
+
+protected function normalizeDateTime(?string $value, ?Carbon $fallback = null): string
+{
+    $fallbackTs = $fallback ? $fallback->copy() : Carbon::now();
+    $value = trim((string)$value);
+    if ($value === '') {
+        return $fallbackTs->format('Y-m-d H:i:s');
+    }
+
+    $value = str_replace(['.', '/'], '-', $value);
+    try {
+        return Carbon::parse($value)->format('Y-m-d H:i:s');
+    } catch (\Throwable $e) {
+        return $fallbackTs->format('Y-m-d H:i:s');
     }
 }
 
@@ -2127,16 +2144,12 @@ private function imeiExists(string $imei, int $productId): bool
         $payment_status = $request->input('payment_status');
 
         $isCustomer = Auth::user()->role_id == 5;
-        $customerIdsForUser = [];
-        if ($isCustomer) {
-            $customerIdsForUser = Customer::where('user_id', Auth::id())->pluck('id')->toArray();
-        }
 
         $q = Purchase::whereDate('created_at', '>=' ,$request->input('starting_date'))->whereDate('created_at', '<=' ,$request->input('ending_date'));
         //check staff access
         $this->staffAccessCheck($q);
         if ($isCustomer) {
-            $q = $q->whereIn('customer_id', $customerIdsForUser);
+            $q = $q->where('user_id', Auth::id());
         }
         if($warehouse_id)
             $q = $q->where('warehouse_id', $warehouse_id);
@@ -2178,7 +2191,7 @@ private function imeiExists(string $imei, int $productId): bool
 
             $this->staffAccessCheck($q);
             if ($isCustomer) {
-                $q = $q->whereIn('customer_id', $customerIdsForUser);
+                $q = $q->where('user_id', Auth::id());
             }
             if($warehouse_id)
                 $q = $q->where('warehouse_id', $warehouse_id);
@@ -2201,6 +2214,9 @@ private function imeiExists(string $imei, int $productId): bool
                 ->limit($limit)
                 ->orderBy($order,$dir);
 
+            if ($isCustomer) {
+                $q = $q->where('purchases.user_id', Auth::id());
+            }
 
             if(Auth::user()->role_id > 2 && config('staff_access') == 'own') {
                 $q =  $q->with('supplier', 'warehouse','wproduction'
@@ -2368,9 +2384,9 @@ private function imeiExists(string $imei, int $productId): bool
                     </div>';
 
                 // data for purchase details by one click
-                $user = User::find($purchase->user_id);
-                $customer = Customer::find($purchase->user_id);
-                $nestedData['supplier'] = $user?->name ?? $customer?->name ?? null;
+                $customer = Customer::with('user')->find($purchase->customer_id);
+                $user = $customer?->user ?? User::find($purchase->user_id);
+                $nestedData['supplier'] = $customer?->name ?? $user?->name ?? null;
                 if($purchase->currency_id) {
                     $currency = Currency::select('code')->find($purchase->currency_id);
                     if($currency)
@@ -2432,7 +2448,7 @@ private function imeiExists(string $imei, int $productId): bool
             "draw"            => intval($request->input('draw')),
             "recordsTotal"    => intval($totalData),
             "recordsFiltered" => intval($totalFiltered),
-            "data"            => $data
+            "data"            => $data ?? []
         );
         echo json_encode($json_data);
     }
@@ -2824,7 +2840,7 @@ public function generatePdf($supplierId, $purchaseId)
 {
     $supplier = Supplier::findOrFail($supplierId);
     $purchase = Purchase::with(['supplier', 'warehouse', 'wproduction'])->findOrFail($purchaseId);
-    $customer = Customer::find($purchase->user_id);
+    $customer = Customer::find($purchase->customer_id);
     $currency = Currency::find($purchase->currency_id);
 
     $products = ProductPurchase::with('unit')
@@ -3256,7 +3272,7 @@ public function shipmentModal(Request $request)
         ->where('supplier_id', $supplierId)
         ->first();
 
-    $customer = Customer::find($purchase->user_id);
+    $customer = Customer::find($purchase->customer_id);
     $warehouse = $purchase->warehouse;
 
     $products = ProductPurchase::with(['product', 'purchase_unit']) // 👈 use purchase_unit here
@@ -3755,7 +3771,8 @@ private function getPurchaseStatusText($status)
     }
 
     // ---------------- Normalize header ----------------
-    $data['created_at']  = date("Y-m-d", strtotime(str_replace("/", "-", $data['created_at'] ?? now()->toDateString()))) . ' ' . date("H:i:s");
+    $defaultCreatedAt = $purchase->created_at instanceof Carbon ? $purchase->created_at : Carbon::now();
+    $data['created_at'] = $this->normalizeDateTime($data['created_at'] ?? null, $defaultCreatedAt);
     $data['customer_id'] = $request->input('customer_id', $purchase->customer_id);
 
     $balance = (float)($data['grand_total'] ?? 0) - (float)($data['paid_amount'] ?? 0);
@@ -4157,7 +4174,8 @@ private function getPurchaseStatusText($status)
         return redirect('purchases')->with('message', __('db.Purchase updated successfully'));
     } catch (\Exception $e) {
         DB::rollBack();
-        return redirect()->route('purchases.edit', $id)->with('not_permitted', $e->getMessage());
+        report($e);
+        return back()->withInput()->with('not_permitted', $e->getMessage());
     }
 }
 
