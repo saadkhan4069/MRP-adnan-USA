@@ -70,6 +70,7 @@ use App\Http\Controllers\TranslationController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\WooCommerceController;
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
@@ -423,6 +424,7 @@ Route::get('shipments/po-search', [ShipmentController::class, 'poSearch'])->name
 
 Route::get('shipment/create', [PurchaseController::class, 'createshipment'])->name('shipment.create');
 Route::post('shipment/store', [PurchaseController::class, 'shipmentstore'])->name('shipment.store');
+Route::get('shipment/dashboard', [PurchaseController::class, 'shipmentDashboard'])->name('shipment.dashboard');
 Route::get('shipment/index', [PurchaseController::class, 'shipmentindex'])->name('shipment.index');
 Route::get('shipmentDatatable', [PurchaseController::class, 'shipmentDatatable'])->name('shipmentDatatable');
 
@@ -433,6 +435,9 @@ Route::get('shipment/{shipment}/edit', [PurchaseController::class, 'shipmentedit
 
 Route::match(['put','patch'], 'shipment/{shipment}', [PurchaseController::class, 'shipmentupdate'])
     ->name('shipments.update');
+
+Route::post('shipment/{shipment}/update-date', [PurchaseController::class, 'shipmentUpdateDate'])
+    ->name('shipment.update-date');
 
 Route::delete('shipment/{id}', [PurchaseController::class, 'shipmentdestroy'])
     ->name('shipments.destroy');
@@ -447,7 +452,42 @@ Route::post('shipment/{shipment}/label', [PurchaseController::class, 'shipmentLa
 Route::get('shipment-labels/{label}/download', [ShipmentLabelController::class, 'download'])
     ->name('shipment.label.download');
 
+// Proforma Invoice PDF
+Route::get('shipment/{shipment}/proforma-invoice', [PurchaseController::class, 'shipmentProformaInvoice'])
+    ->name('shipment.proforma-invoice');
+
+// Bill of Lading - Store data
+Route::post('shipment/{shipment}/bill-of-lading', [PurchaseController::class, 'shipmentBillOfLadingStore'])
+    ->name('shipment.bill-of-lading.store');
+// Bill of Lading PDF
+Route::get('shipment/{shipment}/bill-of-lading', [PurchaseController::class, 'shipmentBillOfLading'])
+    ->name('shipment.bill-of-lading');
+
+// Portal Shipping Label PDF
+Route::get('shipment/{shipment}/portal-label-pdf', [PurchaseController::class, 'shipmentPortalLabelPdf'])
+    ->name('shipment.portal-label-pdf');
+
  // Shipped label routes inside web.php
+
+//--------------------WooCommerce Orders-----------------------------------
+Route::prefix('woocommerce')->name('woocommerce.')->group(function () {
+    // API Settings
+    Route::get('api-settings', [WooCommerceController::class, 'apiSettings'])->name('api-settings');
+    Route::post('api-settings', [WooCommerceController::class, 'storeApiSettings'])->name('api-settings.store');
+    Route::put('api-settings/{id}', [WooCommerceController::class, 'updateApiSettings'])->name('api-settings.update');
+    Route::get('api-settings/{id}/test', [WooCommerceController::class, 'testConnection'])->name('api-settings.test');
+    Route::post('api-settings/{id}/sync', [WooCommerceController::class, 'syncOrders'])->name('api-settings.sync');
+    
+    // Orders
+    Route::get('orders', [WooCommerceController::class, 'index'])->name('orders.index');
+    Route::get('orders/datatable', [WooCommerceController::class, 'ordersDatatable'])->name('orders.datatable');
+    Route::get('orders/create', [WooCommerceController::class, 'create'])->name('orders.create');
+    Route::post('orders', [WooCommerceController::class, 'store'])->name('orders.store');
+    Route::get('orders/{id}', [WooCommerceController::class, 'show'])->name('orders.show');
+    Route::get('orders/{id}/edit', [WooCommerceController::class, 'edit'])->name('orders.edit');
+    Route::put('orders/{id}', [WooCommerceController::class, 'update'])->name('orders.update');
+    Route::delete('orders/{id}', [WooCommerceController::class, 'destroy'])->name('orders.destroy');
+});
 
 //--------------------Catelog-----------------------------------
 Route::get('/products/{product}/catalog/pdf', [CatalogController::class, 'pdf'])

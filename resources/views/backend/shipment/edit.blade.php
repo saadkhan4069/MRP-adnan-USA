@@ -32,6 +32,18 @@
   $itemsInit = [];
   if ($shipment->relationLoaded('items') || method_exists($shipment, 'items')) {
       foreach ($shipment->items as $it) {
+          // Get product name from relationship or fallback to code
+          $productName = $it->product_code; // default fallback
+          if ($it->product) {
+              $productName = $it->product->name ?? $it->product_code;
+          } elseif ($it->product_id) {
+              // Fallback: find product from product lists
+              $foundProduct = collect($lims_product_list_without_variant)->merge($lims_product_list_with_variant)
+                  ->firstWhere('id', $it->product_id);
+              if ($foundProduct) {
+                  $productName = $foundProduct->name ?? $it->product_code;
+              }
+          }
           $itemsInit[] = [
               'id'           => $it->id,
               'product_id'   => $it->product_id,
@@ -41,7 +53,7 @@
               'unit_price'   => (float) $it->net_unit_cost,  // per-unit
               'discount'     => (float) ($it->discount ?? 0),
               'subtotal'     => (float) ($it->subtotal ?? 0),
-              'name'         => $it->product_code, // fallback display
+              'name'         => $productName, // Use actual product name
           ];
       }
   }
@@ -53,6 +65,9 @@
           $packagesInit[] = [
               'id'              => $p->id,
               'packaging'       => $p->packaging,
+              'qty'             => $p->qty ?? 1,
+              'package_class'   => $p->package_class ?? '',
+              'package_nmfc'    => $p->package_nmfc ?? '',
               'declared_value'  => $p->declared_value,
               'weight'          => $p->weight,
               'weight_unit'     => $p->weight_unit ?? 'kg',
@@ -92,14 +107,22 @@
   .osm-suggestions{position:absolute;left:0;right:0;top:100%;z-index:1000;background:#fff;border:1px solid #ccc;max-height:220px;overflow:auto;display:none}
   .osm-suggestions .item{padding:8px;cursor:pointer}
   .osm-suggestions .item:hover{background:#f1f3f5}
-  .table-items{table-layout:fixed}
-  .table-items td,.table-items th{vertical-align:middle}
-  .table-items .form-control{height:36px;padding:6px 10px}
-  .table-items .form-control-sm{height:34px}
+  .table-items{table-layout:fixed;width:100%}
+  .table-items td,.table-items th{vertical-align:middle;padding:10px 8px}
+  .table-items .form-control{height:36px;padding:6px 10px;border:1px solid #ced4da}
+  .table-items .form-control-sm{height:34px;font-size:13px}
   .table-items input[type="number"]{text-align:right}
-  .table-items .sub-total{font-weight:600;text-align:right}
-  .table-items .del-row{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center}
+  .table-items .sub-total{font-weight:600;text-align:right;font-size:14px}
+  .table-items .del-row{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border:none;background:#dc3545;color:#fff;border-radius:4px;cursor:pointer}
+  .table-items .del-row:hover{background:#c82333}
   .text-truncate{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .table-items tbody tr:hover{background-color:#f8f9fa}
+  
+  /* Autocomplete dropdown styling */
+  .ui-autocomplete{max-height:300px;overflow-y:auto;overflow-x:hidden;z-index:9999!important;border:1px solid #ced4da;border-radius:4px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  .ui-autocomplete .ui-menu-item{padding:0;border:none}
+  .ui-autocomplete .ui-menu-item-wrapper{padding:10px 12px;border-bottom:1px solid #f1f3f5;cursor:pointer}
+  .ui-autocomplete .ui-menu-item-wrapper:hover,.ui-autocomplete .ui-menu-item-wrapper.ui-state-active{background:#f8f9fa;border-color:#dee2e6}
 
   /* --- Packages: Pro UI --- */
   .pkg-grid{display:grid;grid-template-columns:1fr;gap:12px}
@@ -132,6 +155,18 @@
   /* FORCE packages grid to single column even on desktop */
   @media (min-width:768px){ .pkg-grid{ grid-template-columns: 1fr !important; gap:16px } }
   @media (min-width:1200px){ .pkg-grid{ grid-template-columns: 1fr !important; } }
+
+  /* Image View Modal */
+  #imageViewModal .modal-body {
+    text-align: center;
+    padding: 20px;
+  }
+  #imageViewModal .modal-body img {
+    max-width: 100%;
+    max-height: 80vh;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
 </style>
 
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
@@ -252,6 +287,26 @@
                         <label>Email *</label>
                         <input type="email" name="ship_from_email" value="{{ old('ship_from_email', $shipment->ship_from_email) }}" class="form-control required-field" placeholder="name@company.com" required>
                       </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Dock Hours</label>
+                        <input type="text" name="ship_from_dock_hours" value="{{ old('ship_from_dock_hours', $shipment->ship_from_dock_hours ?? '') }}" class="form-control" placeholder="e.g. 9:00 AM - 5:00 PM">
+                      </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Lunch Hour</label>
+                        <input type="text" name="ship_from_lunch_hour" value="{{ old('ship_from_lunch_hour', $shipment->ship_from_lunch_hour ?? '') }}" class="form-control" placeholder="e.g. 12:00 PM - 1:00 PM">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label>Pick up / Delivery Instructions</label>
+                        <textarea name="ship_from_pickup_delivery_instructions" class="form-control" rows="2" placeholder="Special instructions for pickup">{{ old('ship_from_pickup_delivery_instructions', $shipment->ship_from_pickup_delivery_instructions ?? '') }}</textarea>
+                      </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Appointment</label>
+                        <input type="text" name="ship_from_appointment" value="{{ old('ship_from_appointment', $shipment->ship_from_appointment ?? '') }}" class="form-control" placeholder="e.g. Appointment required">
+                      </div>
+                      <div class="col-md-9 mb-3">
+                        <label>Accessorial</label>
+                        <textarea name="ship_from_accessorial" class="form-control" rows="2" placeholder="Additional services or requirements">{{ old('ship_from_accessorial', $shipment->ship_from_accessorial ?? '') }}</textarea>
+                      </div>
                     </div>
                   </div>
 
@@ -297,6 +352,26 @@
                       <div class="col-md-3 mb-3">
                         <label>Email *</label>
                         <input type="email" name="ship_to_email" value="{{ old('ship_to_email', $shipment->ship_to_email) }}" class="form-control required-field" placeholder="name@company.com" required>
+                      </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Dock Hours</label>
+                        <input type="text" name="ship_to_dock_hours" value="{{ old('ship_to_dock_hours', $shipment->ship_to_dock_hours ?? '') }}" class="form-control" placeholder="e.g. 9:00 AM - 5:00 PM">
+                      </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Lunch Hour</label>
+                        <input type="text" name="ship_to_lunch_hour" value="{{ old('ship_to_lunch_hour', $shipment->ship_to_lunch_hour ?? '') }}" class="form-control" placeholder="e.g. 12:00 PM - 1:00 PM">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label>Pick up / Delivery Instructions</label>
+                        <textarea name="ship_to_pickup_delivery_instructions" class="form-control" rows="2" placeholder="Special instructions for delivery">{{ old('ship_to_pickup_delivery_instructions', $shipment->ship_to_pickup_delivery_instructions ?? '') }}</textarea>
+                      </div>
+                      <div class="col-md-3 mb-3">
+                        <label>Appointment</label>
+                        <input type="text" name="ship_to_appointment" value="{{ old('ship_to_appointment', $shipment->ship_to_appointment ?? '') }}" class="form-control" placeholder="e.g. Appointment required">
+                      </div>
+                      <div class="col-md-9 mb-3">
+                        <label>Accessorial</label>
+                        <textarea name="ship_to_accessorial" class="form-control" rows="2" placeholder="Additional services or requirements">{{ old('ship_to_accessorial', $shipment->ship_to_accessorial ?? '') }}</textarea>
                       </div>
 
                       <div class="col-md-2 mb-3">
@@ -396,7 +471,7 @@
                       </div>
                       <div class="col-md-4 mb-3">
                         <label><strong>Shipping Cost</strong></label>
-                        <input type="number" step="0.1" name="shipping_cost" id="shipping_cost_input" class="form-control" placeholder="0.00"
+                        <input type="number" step="0.01" name="shipping_cost" id="shipping_cost_input" class="form-control" placeholder="0.00"
                                value="{{ old('shipping_cost', $shipment->shipping_cost ?? 0) }}">
                       </div>
 
@@ -430,7 +505,27 @@
                         @forelse($attachments as $att)
                           @php
                             $disk = $att->disk ?? 'public';
-                            $url  = \Illuminate\Support\Facades\Storage::disk($disk)->exists($att->path ?? '') ? \Illuminate\Support\Facades\Storage::disk($disk)->url($att->path) : null;
+                            $path = $att->path ?? '';
+                            $ext = strtolower(pathinfo($att->filename ?? '', PATHINFO_EXTENSION));
+                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+                            $isExcel = in_array($ext, ['xls', 'xlsx']);
+                            $isDoc = in_array($ext, ['doc', 'docx']);
+                            
+                            // Generate correct URL
+                            if ($path) {
+                              if ($disk === 'public') {
+                                // Check if path starts with 'shipment/' (new format) or 'shipment_attachments/' (old format)
+                                if (strpos($path, 'shipment/') === 0) {
+                                  $url = asset($path);
+                                } else {
+                                  $url = asset('storage/' . $path);
+                                }
+                              } else {
+                                $url = \Illuminate\Support\Facades\Storage::disk($disk)->exists($path) ? \Illuminate\Support\Facades\Storage::disk($disk)->url($path) : null;
+                              }
+                            } else {
+                              $url = null;
+                            }
                           @endphp
                           <tr>
                             <td>
@@ -443,8 +538,18 @@
                             <td>{{ number_format(($att->size ?? 0)/1024, 0) }} KB</td>
                             <td class="d-flex align-items-center" style="gap:.5rem">
                               @if($url)
-                                <a class="btn btn-outline-primary btn-sm" href="{{ $url }}" target="_blank"><i class="fa fa-eye"></i> View</a>
-                                <a class="btn btn-outline-secondary btn-sm" href="{{ $url }}" download><i class="fa fa-download"></i> Download</a>
+                                @if($isImage)
+                                  <button type="button" class="btn btn-outline-primary btn-sm view-image-btn" data-image-url="{{ $url }}" data-image-name="{{ $att->original_name ?? basename($att->path ?? '') }}">
+                                    <i class="fa fa-eye"></i> View
+                                  </button>
+                                @else
+                                  <a class="btn btn-outline-primary btn-sm" href="{{ $url }}" target="_blank" title="Open {{ $isExcel ? 'Excel' : ($isDoc ? 'Word' : 'File') }}">
+                                    <i class="fa fa-{{ $isExcel ? 'file-excel-o' : ($isDoc ? 'file-word-o' : 'eye') }}"></i> View
+                                  </a>
+                                @endif
+                                <a class="btn btn-outline-secondary btn-sm" href="{{ $url }}" download>
+                                  <i class="fa fa-download"></i> Download
+                                </a>
                               @else
                                 <span class="text-muted">N/A</span>
                               @endif
@@ -467,8 +572,8 @@
                         <div class="form-group">
                           <label class="mb-1">Add files</label>
                           <input type="file" name="new_attachments[]" id="new_attachments" class="form-control" multiple
-                                 accept="application/pdf,image/jpeg,image/png,image/webp">
-                          <small class="text-muted">You can select multiple files.</small>
+                                 accept="application/pdf,image/jpeg,image/png,image/webp,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                          <small class="text-muted">You can select multiple files (PDF, Images, Excel, Word).</small>
                         </div>
 
                         <div id="new-files-list" class="mt-2" style="display:none">
@@ -562,6 +667,33 @@
   </div>
 </section>
 
+{{-- Image View Modal --}}
+<div class="modal fade" id="imageViewModal" tabindex="-1" role="dialog" aria-labelledby="imageViewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageViewModalLabel">View Image</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <img id="modalImage" src="" alt="" style="display: none;">
+        <div id="imageLoading" class="text-center">
+          <i class="fa fa-spinner fa-spin fa-3x"></i>
+          <p class="mt-2">Loading image...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <a id="downloadImageBtn" href="" download class="btn btn-primary">
+          <i class="fa fa-download"></i> Download
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 @push('scripts')
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script>
@@ -578,6 +710,22 @@ function showStep(n){
   panes.forEach((p,i)=>p.classList.toggle('active',(i+1)===n));
   badges.forEach((b,i)=>{b.classList.toggle('active',(i+1)===n);b.classList.toggle('done',(i+1)<n)});
   document.getElementById('prev-step').disabled=(n===1);
+  // Initialize autocomplete when step 4 (items) is shown
+  if(n === 4) {
+    console.log('Step 4 activated, initializing autocomplete...');
+    setTimeout(function(){
+      initProductAutocomplete();
+      // Test if autocomplete is working
+      setTimeout(function(){
+        const $input = $('#lims_productcodeSearch');
+        if ($input.hasClass('ui-autocomplete-input')) {
+          console.log('Autocomplete initialized successfully');
+        } else {
+          console.error('Autocomplete failed to initialize');
+        }
+      }, 200);
+    }, 200);
+  }
 }
 document.getElementById('next-step').addEventListener('click',()=>{ if(!validateStep(currentStep))return; if(currentStep<totalSteps){currentStep++;showStep(currentStep);} });
 document.getElementById('prev-step').addEventListener('click',()=>{ if(currentStep>1){currentStep--;showStep(currentStep);} });
@@ -604,35 +752,56 @@ function clearInvalid(el){ $(el).removeClass('is-invalid'); }
 $(document).on('input change blur','.required-field',function(){ if(normalizeValue($(this))) clearInvalid(this); });
 
 /* ---------------- Product search dataset (same as create) ---------------- */
-<?php $productArray = []; ?>
-var lims_product_code = [
-@foreach($lims_product_list_without_variant as $product)
-  <?php $productArray[] =
-    htmlspecialchars($product->code).'|' .
-    preg_replace('/[\n\r]/'," ",htmlspecialchars($product->name))." (".$product->title.")" . '|' .
-    $product->id . '|' .
-    (float)$product->cost; ?>
-@endforeach
-@foreach($lims_product_list_with_variant as $product)
-  <?php $productArray[] =
-    htmlspecialchars($product->item_code).'|' .
-    preg_replace('/[\n\r]/'," ",htmlspecialchars($product->name))." (".$product->title.")" . '|' .
-    $product->id . '|' .
-    (float)$product->cost; ?>
-@endforeach
-{!! '"'.implode('","', $productArray).'"' !!}
+<?php 
+$productArray = []; 
+// Debug: Check if product lists exist
+$debugInfo = [
+  'without_variant_count' => count($lims_product_list_without_variant ?? []),
+  'with_variant_count' => count($lims_product_list_with_variant ?? [])
 ];
 
-$('#lims_productcodeSearch').autocomplete({
-  source: function(req,res){
-    const rx = new RegExp(".?"+$.ui.autocomplete.escapeRegex(req.term),"i");
-    res($.grep(lims_product_code, function(it){ return rx.test(it); }));
-  },
-  minLength: 1,
-  select: function(e, ui){ addFromCode(ui.item.value); $(this).val(''); return false; },
-  response: function(e, ui){ if(ui.content.length===1){ addFromCode(ui.content[0].value); $('#lims_productcodeSearch').val(''); } },
-  focus: function(){ return false; }
-});
+foreach($lims_product_list_without_variant ?? [] as $product) {
+  if ($product && isset($product->code)) {
+    $productArray[] = 
+      htmlspecialchars($product->code ?? '').'|' .
+      preg_replace('/[\n\r]/'," ",htmlspecialchars($product->name ?? ''))." (".($product->title ?? '').")" . '|' .
+      ($product->id ?? '').'|' .
+      (float)($product->price ?? $product->cost ?? 0);
+  }
+}
+foreach($lims_product_list_with_variant ?? [] as $product) {
+  if ($product && isset($product->item_code)) {
+    $productArray[] =
+      htmlspecialchars($product->item_code ?? '').'|' .
+      preg_replace('/[\n\r]/'," ",htmlspecialchars($product->name ?? ''))." (".($product->brand_title ?? $product->title ?? '').")" . '|' .
+      ($product->id ?? '').'|' .
+      (float)($product->price ?? $product->cost ?? 0);
+  }
+}
+?>
+var lims_product_code = [
+<?php if (!empty($productArray)): ?>
+{!! '"'.implode('","', array_filter($productArray)).'"' !!}
+<?php endif; ?>
+];
+
+// Debug PHP side
+console.log('PHP Debug - Products without variant:', <?php echo $debugInfo['without_variant_count']; ?>);
+console.log('PHP Debug - Products with variant:', <?php echo $debugInfo['with_variant_count']; ?>);
+console.log('PHP Debug - Total in array:', <?php echo count($productArray); ?>);
+
+// Debug: Log product count and sample
+if (typeof lims_product_code !== 'undefined') {
+  console.log('Products loaded for autocomplete:', lims_product_code.length);
+  if (lims_product_code.length > 0) {
+    console.log('Sample product:', lims_product_code[0]);
+    console.log('Full array:', lims_product_code);
+  } else {
+    console.warn('Product array is empty!');
+  }
+} else {
+  console.error('lims_product_code array is not defined!');
+}
 
 /* ---------------- Items (EDIT flavour) ---------------- */
 let base_cost = []; // base cost in base unit (before unit op)
@@ -671,13 +840,50 @@ function parseRowUnitCost(rowIdx, $row) {
   return Number.isFinite(ui) ? ui : base;
 }
 
-/* row HTML (with IDs for edit) */
-function makeItemRowHtml(name, code){
-  return `
+function insertRowAtEnd(item){
+  const $row = $(`
     <tr>
       <td>
-        <div class="fw-semibold text-truncate" title="\${name||code||''}">\${name||code||''}</div>
-        <div class="small text-muted">\${code||''}</div>
+        <div class="fw-semibold text-truncate" title="${item.name}">${item.name}</div>
+        <div class="small text-muted">${item.code}</div>
+        <input type="hidden" class="item-id"       name="item_id[]">
+        <input type="hidden" class="product-id"    name="product_id[]"   value="${item.id}">
+        <input type="hidden" class="product-code" name="product_code[]" value="${item.code}">
+        <input type="hidden" class="net_unit_cost" name="net_unit_cost[]">
+        <input type="hidden" class="discount"      name="discount[]" value="0">
+      </td>
+      <td>
+        <div class="d-flex" style="gap:6px; align-items:center;">
+          <input type="number" class="form-control form-control-sm qty" name="qty[]" value="1" min="1" style="max-width:90px">
+          <select class="form-control form-control-sm unit-select" name="product_unit[]" style="min-width:120px">
+            ${unitOptionsHtml()}
+          </select>
+          <input type="number" class="form-control form-control-sm row-unit-price" step="0.01" placeholder="0.00" style="max-width:140px">
+        </div>
+      </td>
+      <td class="sub-total">0.00<input type="hidden" class="subtotal-value" name="subtotal[]"></td>
+      <td class="text-end"><button type="button" class="btn btn-sm btn-danger del-row" title="Remove">&times;</button></td>
+    </tr>
+  `);
+
+  $("#items-table tbody").append($row);
+  base_cost.push(item.cost||0);
+  const idx = $('#items-table tbody tr').length - 1;
+
+  let unitPrice = parseRowUnitCost(idx, $row);
+  if (!Number.isFinite(unitPrice)) unitPrice = (item.cost || 0) * (Number.isFinite(exchangeRate)?exchangeRate:1);
+  $row.find('.row-unit-price').val(unitPrice.toFixed({{ $dec }})).trigger('input');
+  calculateRow(idx);
+}
+
+function insertExistingRow(it){
+  const displayName = it.name || it.product_code || ('#'+it.product_id);
+  const displayCode = it.product_code || '';
+  const $row = $(`
+    <tr>
+      <td>
+        <div class="fw-semibold text-truncate" title="${displayName}">${displayName}</div>
+        <div class="small text-muted">${displayCode}</div>
         <input type="hidden" class="item-id"       name="item_id[]">
         <input type="hidden" class="product-id"    name="product_id[]">
         <input type="hidden" class="product-code"  name="product_code[]">
@@ -696,29 +902,8 @@ function makeItemRowHtml(name, code){
       <td class="sub-total">0.00<input type="hidden" class="subtotal-value" name="subtotal[]"></td>
       <td class="text-end"><button type="button" class="btn btn-sm btn-danger del-row" title="Remove">&times;</button></td>
     </tr>
-  `;
-}
-
-function insertRowAtEnd(item){
-  const $row = $(makeItemRowHtml(item.name, item.code));
-  $("#items-table tbody").append($row);
-  base_cost.push(item.cost||0);
-  const idx = $('#items-table tbody tr').length - 1;
-
-  // default unit price from cost map (newly added)
-  let unitPrice = parseRowUnitCost(idx, $row);
-  if (!Number.isFinite(unitPrice)) unitPrice = (item.cost || 0) * (Number.isFinite(exchangeRate)?exchangeRate:1);
-
-  // set basics
-  $row.find('.product-id').val(item.id||'');
-  $row.find('.product-code').val(item.code||'');
-  $row.find('.row-unit-price').val(unitPrice.toFixed({{ $dec }})).trigger('input');
-  calculateRow(idx);
-}
-
-function insertExistingRow(it){
-  const displayName = it.name || it.product_code || ('#'+it.product_id);
-  const $row = $(makeItemRowHtml(displayName, it.product_code));
+  `);
+  
   $("#items-table tbody").append($row);
   base_cost.push(0); // not used for existing rows
   const idx = $('#items-table tbody tr').length - 1;
@@ -981,7 +1166,29 @@ function packageCard(i){
             <option value="box">Box</option>
             <option value="envelope">Envelope</option>
             <option value="tube">Tube</option>
+            <option value="pallet">Pallet</option>
+            <option value="other">Other</option>
           </select>
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Qty</label>
+          <input type="number" step="1" min="1" name="package_qty[]" class="form-control" placeholder="1" value="1">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Package Class</label>
+          <input type="text" name="package_class[]" class="form-control" placeholder="e.g. 70">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Package NMFC</label>
+          <input type="text" name="package_nmfc[]" class="form-control" placeholder="e.g. 123456">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Commodity Name</label>
+          <input type="text" name="commodity_name[]" class="form-control" placeholder="e.g. Electronics, Clothing">
         </div>
 
         <div class="pkg-field">
@@ -1036,6 +1243,9 @@ function addPackage(prefill){
 
   if (prefill){
     $card.find('select[name="packaging[]"]').val(prefill.packaging ?? '');
+    $card.find('input[name="package_qty[]"]').val(prefill.qty ?? prefill.package_qty ?? 1);
+    $card.find('input[name="package_class[]"]').val(prefill.package_class ?? '');
+    $card.find('input[name="package_nmfc[]"]').val(prefill.package_nmfc ?? '');
     $card.find('input[name="declared_value[]"]').val(prefill.declared_value ?? '');
     $card.find('input[name="weight[]"]').val(prefill.weight ?? '');
     $card.find('select[name="weight_unit[]"]').val(prefill.weight_unit ?? 'kg');
@@ -1067,6 +1277,10 @@ $('#packages').on('click', '.btn-duplicate', function(){
 function collectPkgValues($c){
   return {
     packaging:        $c.find('select[name="packaging[]"]').val(),
+    qty:              $c.find('input[name="package_qty[]"]').val() || 1,
+    package_class:    $c.find('input[name="package_class[]"]').val(),
+    package_nmfc:     $c.find('input[name="package_nmfc[]"]').val(),
+    commodity_name:   $c.find('input[name="commodity_name[]"]').val(),
     declared_value:   $c.find('input[name="declared_value[]"]').val(),
     weight:           $c.find('input[name="weight[]"]').val(),
     weight_unit:      $c.find('select[name="weight_unit[]"]').val(),
@@ -1146,6 +1360,92 @@ $('#packages').sortable({
   updateSummary();
 })();
 
+// Initialize autocomplete function
+function initProductAutocomplete() {
+  if (typeof $.ui !== 'undefined' && $.ui.autocomplete) {
+    const $input = $('#lims_productcodeSearch');
+    if ($input.length) {
+      // Destroy existing autocomplete if any
+      if ($input.hasClass('ui-autocomplete-input')) {
+        $input.autocomplete('destroy');
+      }
+      
+      // Check if lims_product_code array exists and has data
+      if (typeof lims_product_code === 'undefined' || !Array.isArray(lims_product_code) || lims_product_code.length === 0) {
+        console.warn('lims_product_code array is empty or not defined');
+        return;
+      }
+      
+      $input.autocomplete({
+        source: function(req,res){
+          if (!lims_product_code || lims_product_code.length === 0) {
+            console.log('No products available');
+            res([]);
+            return;
+          }
+          const term = req.term || '';
+          console.log('Search term:', term, 'Products array length:', lims_product_code);
+          
+          // Debug: Show first product
+          if (lims_product_code.length > 0) {
+            console.log('First product in array:', lims_product_code[0]);
+          }
+          
+          // Use simpler regex pattern that matches anywhere in the string
+          const escapedTerm = $.ui.autocomplete.escapeRegex(term);
+          const rx = new RegExp(escapedTerm, "i");
+          
+          const matches = $.grep(lims_product_code, function(it){ 
+            const matched = rx.test(it);
+            if (matched) {
+              console.log('Match found:', it);
+            }
+            return matched;
+          });
+          
+          console.log('Matches found:', matches.length);
+          if (matches.length > 0) {
+            console.log('First match:', matches[0]);
+          }
+          res(matches);
+        },
+        minLength: 1,
+        select: function(e, ui){ 
+          if (ui.item && ui.item.value) {
+            addFromCode(ui.item.value); 
+            $(this).val(''); 
+          }
+          return false; 
+        },
+        response: function(e, ui){ 
+          if(ui.content && ui.content.length === 1 && ui.content[0].value){ 
+            addFromCode(ui.content[0].value); 
+            $('#lims_productcodeSearch').val(''); 
+          } 
+        },
+        focus: function(){ return false; }
+      });
+    }
+  } else {
+    console.warn('jQuery UI Autocomplete not loaded');
+  }
+}
+
+// Initialize autocomplete when document is ready and step 4 might be active
+$(document).ready(function(){
+  console.log('Document ready, checking for step 4...');
+  console.log('Products array available:', typeof lims_product_code !== 'undefined' ? lims_product_code.length : 'undefined');
+  // Check if step 4 is active on page load
+  if ($('#step-4').hasClass('active')) {
+    console.log('Step 4 is active on page load, initializing autocomplete...');
+    setTimeout(function(){
+      initProductAutocomplete();
+    }, 500);
+  } else {
+    console.log('Step 4 not active, will initialize when user navigates to it');
+  }
+});
+
 /* -------- Attachments: show selected files table -------- */
 const fileInput = document.getElementById('new_attachments');
 const listWrap  = document.getElementById('new-files-list');
@@ -1170,6 +1470,36 @@ if (fileInput && listWrap && listBody) {
     listWrap.style.display='block';
   });
 }
+
+// Image view functionality
+$(document).ready(function() {
+  // Use event delegation for dynamically added buttons
+  $(document).on('click', '.view-image-btn', function() {
+    const imageUrl = $(this).data('image-url');
+    const imageName = $(this).data('image-name') || 'image';
+    
+    $('#modalImage').attr('src', imageUrl).attr('alt', imageName);
+    $('#modalImage').attr('style', 'display: none;');
+    $('#imageLoading').show();
+    $('#downloadImageBtn').attr('href', imageUrl).attr('download', imageName);
+    
+    $('#imageViewModal').modal('show');
+    
+    // Show image when loaded
+    $('#modalImage').off('load error').on('load', function() {
+      $('#imageLoading').hide();
+      $(this).show();
+    }).on('error', function() {
+      $('#imageLoading').html('<p class="text-danger">Failed to load image. Please try downloading instead.</p>');
+    });
+  });
+  
+  // Reset modal when closed
+  $('#imageViewModal').on('hidden.bs.modal', function() {
+    $('#modalImage').attr('src', '').hide();
+    $('#imageLoading').show().html('<i class="fa fa-spinner fa-spin fa-3x"></i><p class="mt-2">Loading image...</p>');
+  });
+});
 </script>
 @endpush
 @endsection

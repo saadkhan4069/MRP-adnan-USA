@@ -154,10 +154,10 @@ class PurchaseController extends Controller
 public function createshipment()
 {
     $role = Role::find(Auth::user()->role_id);
-
-    //     if($role->hasPermissionTo('purchases-add')){
-    //     return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
-    // }
+    $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-add')->first();
+    if($permission && !$role->hasPermissionTo('shipments-add')){
+        return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+    }
 
     // Customers (role based filter same as before)
     $lims_customer_list = Customer::with('user')->get();
@@ -212,6 +212,7 @@ public function createshipment()
     public function shipmentstore(Request $request)
     {
         // ---------- 1) Validate ----------
+        
         $data = $request->validate([
             // Meta
             'po_no'        => ['nullable','string','max:191'],
@@ -240,6 +241,16 @@ public function createshipment()
             'ship_to_zipcode'     => ['required','string','max:191'],
             'ship_to_contact'     => ['required','string','max:191'],
             'ship_to_email'       => ['required','email','max:191'],
+            'ship_from_dock_hours' => ['nullable','string','max:225'],
+            'ship_to_dock_hours'   => ['nullable','string','max:225'],
+            'ship_from_lunch_hour' => ['nullable','string','max:255'],
+            'ship_from_pickup_delivery_instructions' => ['nullable','string'],
+            'ship_from_appointment' => ['nullable','string','max:255'],
+            'ship_from_accessorial' => ['nullable','string'],
+            'ship_to_lunch_hour' => ['nullable','string','max:255'],
+            'ship_to_pickup_delivery_instructions' => ['nullable','string'],
+            'ship_to_appointment' => ['nullable','string','max:255'],
+            'ship_to_accessorial' => ['nullable','string'],
 
             // Currency
             'currency_id'   => ['nullable','integer'],
@@ -264,25 +275,26 @@ public function createshipment()
 
             'comments' => ['nullable','string'],
 
-            // Items arrays
-            'product_id'      => ['array'],
-            'product_id.*'    => ['required','integer'],
-            'product_code'    => ['array'],
+            // Items arrays (optional - items are optional in shipment)
+            'product_id'      => ['nullable','array'],
+            'product_id.*'    => ['required_with:product_id','integer'],
+            'product_code'    => ['nullable','array'],
             'product_code.*'  => ['nullable','string','max:191'],
-            'product_unit'    => ['array'],
+            'product_unit'    => ['nullable','array'],
             'product_unit.*'  => ['nullable','string','max:191'],
-            'qty'             => ['array'],
-            'qty.*'           => ['required','numeric','min:1'],
-            'net_unit_cost'   => ['array'],
-            'net_unit_cost.*' => ['required','numeric','min:0'],
-            'discount'        => ['array'],
+            'qty'             => ['nullable','array'],
+            'qty.*'           => ['required_with:qty','numeric','min:0.0001'],
+            'net_unit_cost'   => ['nullable','array'],
+            'net_unit_cost.*' => ['required_with:net_unit_cost','numeric','min:0'],
+            'discount'        => ['nullable','array'],
             'discount.*'      => ['nullable','numeric','min:0'],
-            'subtotal'        => ['array'],
-            'subtotal.*'      => ['required','numeric','min:0'],
+            'subtotal'        => ['nullable','array'],
+            'subtotal.*'      => ['required_with:subtotal','numeric','min:0'],
 
             // Packages arrays
             'packages'                         => ['array'],
             'packages.*.packaging'             => ['nullable','string','max:191'],
+            'packages.*.qty'                   => ['nullable','integer','min:1'],
             'packages.*.weight'                => ['nullable','numeric','min:0'],
             'packages.*.weight_unit'           => ['nullable', Rule::in(['kg','lb'])],
             'packages.*.length'                => ['nullable','numeric','min:0'],
@@ -311,14 +323,20 @@ public function createshipment()
         $discounts = (array) $request->input('discount', []);
         $subtotals = (array) $request->input('subtotal', []);
 
-        // Totals
-        $lineQtySum = 0; $lineTotal = 0;
+        // Totals - handle empty arrays safely
+        $lineQtySum = 0; 
+        $lineTotal = 0;
         $itemsCount = count($prodIds);
-        for ($i = 0; $i < $itemsCount; $i++) {
-            $q   = (float) ($qtys[$i]       ?? 0);
-            $sub = (float) ($subtotals[$i]  ?? 0);
-            $lineQtySum += $q;
-            $lineTotal  += $sub;
+        
+        // Fix: Only calculate if products exist
+        if($itemsCount > 0) {
+            for ($i = 0; $i < $itemsCount; $i++) {
+                if(!isset($prodIds[$i]) || !$prodIds[$i]) continue; // Skip empty entries
+                $q   = (float) ($qtys[$i]       ?? 0);
+                $sub = (float) ($subtotals[$i]  ?? 0);
+                $lineQtySum += $q;
+                $lineTotal  += $sub;
+            }
         }
         $orderDiscount = (float)$request->order_discount;
         $baseForTax    = max($lineTotal - $orderDiscount, 0);
@@ -365,7 +383,16 @@ public function createshipment()
                     'ship_to_zipcode'    => $data['ship_to_zipcode'],
                     'ship_to_contact'    => $data['ship_to_contact'],
                     'ship_to_email'      => $data['ship_to_email'],
-
+                    'ship_from_dock_hours' => $data['ship_from_dock_hours'],
+                    'ship_to_dock_hours'   => $data['ship_to_dock_hours'],
+                    'ship_from_lunch_hour' => $data['ship_from_lunch_hour'] ?? null,
+                    'ship_from_pickup_delivery_instructions' => $data['ship_from_pickup_delivery_instructions'] ?? null,
+                    'ship_from_appointment' => $data['ship_from_appointment'] ?? null,
+                    'ship_from_accessorial' => $data['ship_from_accessorial'] ?? null,
+                    'ship_to_lunch_hour' => $data['ship_to_lunch_hour'] ?? null,
+                    'ship_to_pickup_delivery_instructions' => $data['ship_to_pickup_delivery_instructions'] ?? null,
+                    'ship_to_appointment' => $data['ship_to_appointment'] ?? null,
+                    'ship_to_accessorial' => $data['ship_to_accessorial'] ?? null,
                     // currency
                     'currency_id'   => $data['currency_id']   ?? null,
                     'exchange_rate' => $data['exchange_rate'],
@@ -400,24 +427,26 @@ public function createshipment()
                     'comments'       => $data['comments'] ?? null,
                 ]);
 
-                // Items
-                for ($i = 0; $i < $itemsCount; $i++) {
-                    if (!isset($prodIds[$i])) continue;
-                    $punitRaw = $prodUnits[$i] ?? null;
-                    if (is_numeric($punitRaw)) {
-                        $unit = Unit::find((int)$punitRaw);
-                        $punitRaw = $unit ? $unit->name : (string)$punitRaw;
+                // Items - only create if products exist
+                if($itemsCount > 0) {
+                    for ($i = 0; $i < $itemsCount; $i++) {
+                        if (!isset($prodIds[$i]) || !$prodIds[$i]) continue; // Skip empty/invalid entries
+                        $punitRaw = $prodUnits[$i] ?? null;
+                        if (is_numeric($punitRaw)) {
+                            $unit = Unit::find((int)$punitRaw);
+                            $punitRaw = $unit ? $unit->name : (string)$punitRaw;
+                        }
+                        ShipmentItem::create([
+                            'shipment_id'    => $shipment->id,
+                            'product_id'     => (int) $prodIds[$i],
+                            'product_code'   => $prodCodes[$i] ?? null,
+                            'product_unit'   => $punitRaw,
+                            'qty'            => (float)($qtys[$i] ?? 1),
+                            'net_unit_cost'  => (float)($unitCosts[$i] ?? 0),
+                            'discount'       => (float)($discounts[$i] ?? 0),
+                            'subtotal'       => (float)($subtotals[$i] ?? 0),
+                        ]);
                     }
-                    ShipmentItem::create([
-                        'shipment_id'    => $shipment->id,
-                        'product_id'     => (int) $prodIds[$i],
-                        'product_code'   => $prodCodes[$i] ?? null,
-                        'product_unit'   => $punitRaw,
-                        'qty'            => (float)($qtys[$i] ?? 1),
-                        'net_unit_cost'  => (float)($unitCosts[$i] ?? 0),
-                        'discount'       => (float)($discounts[$i] ?? 0),
-                        'subtotal'       => (float)($subtotals[$i] ?? 0),
-                    ]);
                 }
 
                 // Packages
@@ -427,6 +456,10 @@ public function createshipment()
                     ShipmentPackage::create([
                         'shipment_id'    => $shipment->id,
                         'packaging'      => $p['packaging']      ?? null,
+                        'qty'            => $p['qty']            ?? 1,
+                        'package_class'  => $p['package_class']  ?? null,
+                        'package_nmfc'   => $p['package_nmfc']  ?? null,
+                        'commodity_name' => $p['commodity_name']  ?? null,
                         'weight'         => $p['weight']         ?? null,
                         'length'         => $p['length']         ?? null,
                         'width'          => $p['width']          ?? null,
@@ -472,18 +505,32 @@ public function createshipment()
                     }
                 }
             });
-               return redirect()->route('shipment/index')
+               return redirect()->route('shipment.index')
                 ->with('message', 'Shipment created successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Validation errors - return with proper error messages
+            return back()->withErrors($e->errors())->withInput();
         } catch (Throwable $e) {
+            \Log::error('Shipment Store Error: ' . $e->getMessage());
+            \Log::error('Stack Trace: ' . $e->getTraceAsString());
+            \Log::error('Request Data: ' . json_encode($request->all()));
+            // Clean up uploaded files on error
             foreach ($savedFiles as $absPath) {
                 try {
                     if (File::exists($absPath)) File::delete($absPath);
                 } catch (Throwable $ignored) {}
             }
             report($e);
-            return back()
-                ->withInput()
-                ->withErrors(['not_permitted' => 'Failed to create shipment: ' . $e->getMessage()]);
+            
+            // More user-friendly error message
+            $errorMsg = 'Failed to create shipment. ';
+            if(config('app.debug')) {
+                $errorMsg .= $e->getMessage();
+            } else {
+                $errorMsg .= 'Please check all required fields and try again.';
+            }
+            
+            return $e->getMessage();
         }
     }
 
@@ -492,30 +539,117 @@ public function createshipment()
 
 
 
+        public function shipmentDashboard(Request $request)
+        {
+            $role = Role::find(Auth::user()->role_id);
+            $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-index')->first();
+            if($permission && !$role->hasPermissionTo('shipments-index')){
+                return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+            }
+
+            // Get shipment statistics
+            $totalShipments = Shipment::count();
+            $pendingShipments = Shipment::where('status', 1)->count();
+            $inTransitShipments = Shipment::where('status', 2)->count();
+            $deliveredShipments = Shipment::where('status', 3)->count();
+            $returnedShipments = Shipment::where('status', 4)->count();
+            $cancelledShipments = Shipment::where('status', 5)->count();
+
+            // Get total value
+            $totalValue = Shipment::sum('grand_total');
+            
+            // Get shipments by status for chart
+            $statusData = [
+                'Pending' => $pendingShipments,
+                'In Transit' => $inTransitShipments,
+                'Delivered' => $deliveredShipments,
+                'Returned' => $returnedShipments,
+                'Cancelled' => $cancelledShipments,
+            ];
+
+            // Get monthly shipments (last 6 months)
+            $monthlyShipments = Shipment::select(
+                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                DB::raw('COUNT(*) as count')
+            )
+            ->where('created_at', '>=', now()->subMonths(6))
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+
+            // Get recent shipments
+            $recentShipments = Shipment::with('customer')
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Get top customers by shipment count
+            $topCustomers = Shipment::select('customer_id', DB::raw('COUNT(*) as shipment_count'))
+                ->with('customer')
+                ->whereNotNull('customer_id')
+                ->groupBy('customer_id')
+                ->orderBy('shipment_count', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Get shipments by month for line chart
+            $monthlyData = [];
+            foreach ($monthlyShipments as $month) {
+                $monthlyData[] = [
+                    'month' => date('M Y', strtotime($month->month . '-01')),
+                    'count' => $month->count
+                ];
+            }
+
+            return view('backend.shipment.dashboard', compact(
+                'totalShipments',
+                'pendingShipments',
+                'inTransitShipments',
+                'deliveredShipments',
+                'returnedShipments',
+                'cancelledShipments',
+                'totalValue',
+                'statusData',
+                'monthlyData',
+                'recentShipments',
+                'topCustomers'
+            ));
+        }
+
         public function shipmentindex(Request $request)
         {
-               return view('backend.shipment.index');
+            $role = Role::find(Auth::user()->role_id);
+            $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-index')->first();
+            if($permission && !$role->hasPermissionTo('shipments-index')){
+                return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+            }
+            return view('backend.shipment.index');
         }
      
+    
+
      public function shipmentDatatable(Request $request)
 {   
     // Eager load: items, packages, customer (only id,name)
     $shipments = \App\Models\Shipment::with([
             'items:shipment_id,product_code,qty,product_unit,net_unit_cost,subtotal',
-            'packages:shipment_id,packaging,weight,weight_unit,length,width,height,dim_unit,declared_value',
+            'packages:shipment_id,packaging,qty,package_class,package_nmfc,commodity_name,weight,weight_unit,length,width,height,dim_unit,declared_value',
             'customer:id,name'
         ])
         ->latest('id')
         ->get([
             'id','reference_no','po_no','customer_id','status',
-            'ship_from_first_name','ship_from_company','ship_from_address_1','ship_from_city','ship_from_state','ship_from_zipcode','ship_from_country',
-            'ship_to_first_name','ship_to_company','ship_to_address_1','ship_to_city','ship_to_state','ship_to_zipcode','ship_to_country',
+            'ship_from_first_name','ship_from_company','ship_from_address_1','ship_from_city','ship_from_state','ship_from_zipcode','ship_from_country','ship_from_dock_hours',
+            'ship_to_first_name','ship_to_company','ship_to_address_1','ship_to_city','ship_to_state','ship_to_zipcode','ship_to_country','ship_to_dock_hours',
             'grand_total','order_tax','shipping_cost','item','total_qty',
             // 'tracking_number',           // <-- agar yeh bhi column abhi nahi hai to comment rehne do
             'created_at','updated_at'
         ]);
 
     $data = $shipments->map(function ($s) {
+        // Calculate total packages qty
+        $packagesQty = $s->packages->sum('qty') ?? 0;
+        
         return [
             'id'           => $s->id,
             'reference_no' => $s->reference_no,
@@ -524,6 +658,9 @@ public function createshipment()
             'status'       => (int) $s->status,
             'from'         => trim(collect([$s->ship_from_first_name, $s->ship_from_city, $s->ship_from_country])->filter()->join(', ')),
             'to'           => trim(collect([$s->ship_to_first_name, $s->ship_to_city, $s->ship_to_country])->filter()->join(', ')),
+            'ship_from_dock_hours' => $s->ship_from_dock_hours ?? '—',
+            'ship_to_dock_hours'   => $s->ship_to_dock_hours ?? '—',
+            'packages_qty' => $packagesQty,
             'totals'       => [
                 'items'        => $s->item,
                 'qty'          => $s->total_qty,
@@ -547,6 +684,12 @@ public function createshipment()
 
 public function shipmentShow(\App\Models\Shipment $shipment)
 {
+    $role = Role::find(Auth::user()->role_id);
+    // Use shipments-index as view permission (matches permission page structure)
+    $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-index')->first();
+    if($permission && !$role->hasPermissionTo('shipments-index')){
+        return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+    }
     // Relations (attachments included)
     $shipment->load(['items', 'packages', 'customer', 'attachments']);
 
@@ -593,6 +736,7 @@ public function shipmentShow(\App\Models\Shipment $shipment)
     $carrierRequest   = $safeJson($shipment->carrier_request);
     $carrierResponse  = $safeJson($shipment->carrier_response);
     $meta             = $safeJson($shipment->meta);
+    $billOfLadingData = $meta['bill_of_lading'] ?? [];
 
     // Tracking URL
     $provider = strtolower((string) $shipment->provider);
@@ -628,6 +772,8 @@ public function shipmentShow(\App\Models\Shipment $shipment)
         'tracking_number'        => $shipment->tracking_number,
         'master_tracking_number' => $shipment->master_tracking_number,
         'label_format'           => $shipment->label_format,
+        'pickup_date_time'       => $shipment->pickup_date_time,
+        'dropoff_date_time'      => $shipment->dropoff_date_time,
         'label_url'              => $shipment->label_url,
         'invoice_url'            => $shipment->invoice_url,
         'customs_docs_url'       => $shipment->customs_docs_url,
@@ -660,12 +806,18 @@ public function shipmentShow(\App\Models\Shipment $shipment)
         'hasTracking'  => $hasTracking,
         'trackingUrl'  => $trackingUrl,
         'humanSize'    => $humanSize, // pass helper to blade
+        'billOfLading' => $billOfLadingData, // Bill of Lading data from meta
     ]);
 }
 
 
 public function shipmentedit(\App\Models\Shipment $shipment)
 {
+    $role = Role::find(Auth::user()->role_id);
+    $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-edit')->first();
+    if($permission && !$role->hasPermissionTo('shipments-edit')){
+        return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+    }
     $shipment->load(['items', 'packages', 'customer', 'attachments']); // <-- attachments
 
     // ---- Status badge mapping: numeric + string keys both ----
@@ -728,33 +880,9 @@ public function shipmentedit(\App\Models\Shipment $shipment)
         ? \App\Models\Tax::select('id','name','rate')->orderBy('name')->get()
         : collect();
 
-    // Products (without variant)
-    $lims_product_list_without_variant = collect();
-    if (class_exists(\App\Models\Product::class)) {
-        $lims_product_list_without_variant = \App\Models\Product::query()
-            ->when(\Schema::hasColumn('products', 'is_variant'), fn ($q) => $q->where('is_variant', 0))
-            ->leftJoin('brands', 'products.brand_id', '=', 'brands.id')
-            ->selectRaw('products.id, products.code, products.name, brands.title as title, products.cost')
-            ->orderBy('products.name')
-            ->get();
-    }
-
-    // Products (with variant)
-    $lims_product_list_with_variant = collect();
-    if (class_exists(\App\Models\ProductVariant::class)) {
-        $lims_product_list_with_variant = \App\Models\ProductVariant::query()
-            ->join('products', 'product_variants.product_id', '=', 'products.id')
-            ->leftJoin('brands', 'products.brand_id', '=', 'brands.id')
-            ->selectRaw('
-                product_variants.id as id,
-                product_variants.item_code,
-                products.name,
-                brands.title as title,
-                products.cost
-            ')
-            ->orderBy('products.name')
-            ->get();
-    }
+    // Products (use same helper methods as create page)
+    $lims_product_list_without_variant = $this->productWithoutVariant();
+    $lims_product_list_with_variant    = $this->productWithVariant();
 
     return view('backend.shipment.edit', [
         'shipment'                           => $shipment,
@@ -783,6 +911,11 @@ public function shipmentedit(\App\Models\Shipment $shipment)
 
 public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
 {   
+    $role = Role::find(Auth::user()->role_id);
+    $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-edit')->first();
+    if($permission && !$role->hasPermissionTo('shipments-edit')){
+        return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+    }
     // --- 1) Validate Shipment fields ---
     $validated = $request->validate([
         'company_name'        => ['nullable','string','max:100'],
@@ -808,6 +941,16 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
         'ship_to_zipcode'     => ['nullable','string','max:50'],
         'ship_to_contact'     => ['nullable','string','max:100'],
         'ship_to_email'       => ['nullable','email','max:150'],
+        'ship_from_dock_hours' => ['nullable','string','max:225'],
+        'ship_to_dock_hours'   => ['nullable','string','max:225'],
+        'ship_from_lunch_hour' => ['nullable','string','max:255'],
+        'ship_from_pickup_delivery_instructions' => ['nullable','string'],
+        'ship_from_appointment' => ['nullable','string','max:255'],
+        'ship_from_accessorial' => ['nullable','string'],
+        'ship_to_lunch_hour' => ['nullable','string','max:255'],
+        'ship_to_pickup_delivery_instructions' => ['nullable','string'],
+        'ship_to_appointment' => ['nullable','string','max:255'],
+        'ship_to_accessorial' => ['nullable','string'],
         'currency_id'         => ['nullable','integer'],
         'exchange_rate'       => ['nullable','numeric'],
         'service_code'        => ['nullable','string','max:100'],
@@ -820,7 +963,7 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
         'declared_value_total'=> ['nullable','numeric'],
         'order_tax_rate'      => ['nullable','numeric'],
         'order_discount'      => ['nullable','numeric'],
-        'shipping_cost'       => ['nullable','numeric'],
+        'shipping_cost'       => ['nullable','numeric','min:0'],
         'comments'            => ['nullable','string'],
         'total_qty'           => ['nullable','numeric'],
         'total_tax'           => ['nullable','numeric'],
@@ -852,13 +995,48 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
         'delete_attachment_ids'     => ['nullable','array'],
         'delete_attachment_ids.*'   => ['integer','exists:shipment_attachments,id'],
         'new_attachments'           => ['nullable','array'],
-        'new_attachments.*'         => ['file','mimes:pdf,jpg,jpeg,png,webp','max:5120'],
+        'new_attachments.*'         => ['file','mimes:pdf,jpg,jpeg,png,webp,xls,xlsx,doc,docx','max:5120'],
         'new_titles'                => ['nullable','array'],
         'new_titles.*'              => ['nullable','string','max:190'],
     ]);
 
     // --- 2) Update Shipment itself ---
-    $shipment->update($validated);
+    // Ensure new fields are included in update (even if empty/null)
+    $updateData = $validated;
+    
+    // Add new fields explicitly (they're nullable, so include even if empty)
+    $newFields = [
+        'ship_from_lunch_hour',
+        'ship_from_pickup_delivery_instructions',
+        'ship_from_appointment',
+        'ship_from_accessorial',
+        'ship_to_lunch_hour',
+        'ship_to_pickup_delivery_instructions',
+        'ship_to_appointment',
+        'ship_to_accessorial',
+    ];
+    
+    foreach ($newFields as $field) {
+        // Always include the field, even if empty (null or empty string)
+        $updateData[$field] = $request->input($field, null);
+    }
+    
+    \Log::info('Shipment Update Request: ', $request->all());
+    \Log::info('Shipment Update Data (including new fields): ', $updateData);
+    
+    $shipment->update($updateData);
+    
+    \Log::info('Shipment Updated - ID: ' . $shipment->id);
+    \Log::info('Shipment After Update - New Fields: ', [
+        'ship_from_lunch_hour' => $shipment->ship_from_lunch_hour,
+        'ship_from_pickup_delivery_instructions' => $shipment->ship_from_pickup_delivery_instructions,
+        'ship_from_appointment' => $shipment->ship_from_appointment,
+        'ship_from_accessorial' => $shipment->ship_from_accessorial,
+        'ship_to_lunch_hour' => $shipment->ship_to_lunch_hour,
+        'ship_to_pickup_delivery_instructions' => $shipment->ship_to_pickup_delivery_instructions,
+        'ship_to_appointment' => $shipment->ship_to_appointment,
+        'ship_to_accessorial' => $shipment->ship_to_accessorial,
+    ]);
 
     // --- 3) Upsert Items ---
     // NOTE: your blade currently posts flat arrays (product_id[], product_code[] ...)
@@ -903,6 +1081,10 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
     $keptPackageIds = [];
     $pkgIds   = $request->input('package_id', []);
     $pkgTypes = $request->input('packaging', []);
+    $pkgQtys  = $request->input('package_qty', []);
+    $pkgClass = $request->input('package_class', []);
+    $pkgNmfc  = $request->input('package_nmfc', []);
+    $pkgCommodity = $request->input('commodity_name', []);
     $pkgWts   = $request->input('weight', []);
     $pkgWtU   = $request->input('weight_unit', []);
     $pkgL     = $request->input('length', []);
@@ -916,6 +1098,10 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
     for ($i=0; $i<$rows; $i++) {
         $data = [
             'packaging'       => $pkgTypes[$i] ?? null,
+            'qty'             => $pkgQtys[$i] ?? 1,
+            'package_class'   => $pkgClass[$i] ?? null,
+            'package_nmfc'    => $pkgNmfc[$i] ?? null,
+            'commodity_name'  => $pkgCommodity[$i] ?? null,
             'weight'          => $pkgWts[$i] ?? null,
             'weight_unit'     => $pkgWtU[$i] ?? null,
             'length'          => $pkgL[$i] ?? null,
@@ -971,28 +1157,44 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
     if ($request->hasFile('new_attachments')) {
         $files = $request->file('new_attachments');
         $titles= $request->input('new_titles', []);
+        
+        // Create directory in public/shipment/
+        $baseDir = public_path('shipment');
+        if (!\Illuminate\Support\Facades\File::exists($baseDir)) {
+            \Illuminate\Support\Facades\File::makeDirectory($baseDir, 0775, true);
+        }
+        
         foreach ($files as $idx => $file) {
             if (!$file->isValid()) continue;
 
-            $disk = 'public';
-            $dir  = 'shipment_attachments/'.$shipment->id;
-            $path = $file->store($dir, $disk);
-
+            // Get file metadata BEFORE moving the file
             $mime = $file->getClientMimeType();
             $size = $file->getSize();
             $orig = $file->getClientOriginalName();
+            $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension());
+            
+            $uuid = (string) \Illuminate\Support\Str::uuid();
+            $newName = now()->format('YmdHis') . '-' . $uuid . '.' . $ext;
+            
+            // Move file to public/shipment/
+            $file->move($baseDir, $newName);
+            $relativePath = 'shipment/' . $newName;
+
             $title= $titles[$idx] ?? pathinfo($orig, PATHINFO_FILENAME);
 
             $type = 'other';
             if (str_contains($mime, 'pdf')) $type='pdf';
             elseif (str_contains($mime, 'image')) $type='image';
+            elseif (in_array($ext, ['xls', 'xlsx'])) $type='excel';
+            elseif (in_array($ext, ['doc', 'docx'])) $type='doc';
 
             \App\Models\ShipmentAttachment::create([
                 'shipment_id'   => $shipment->id,
                 'title'         => $title,
                 'original_name' => $orig,
-                'disk'          => $disk,
-                'path'          => $path,
+                'filename'      => $newName,
+                'disk'          => 'public',
+                'path'          => $relativePath,
                 'size'          => $size,
                 'mime'          => $mime,
                 'type'          => $type,
@@ -1007,6 +1209,11 @@ public function shipmentupdate(Request $request, \App\Models\Shipment $shipment)
 
 public function shipmentdestroy($id)
 {
+    $role = Role::find(Auth::user()->role_id);
+    $permission = \Spatie\Permission\Models\Permission::where('name', 'shipments-delete')->first();
+    if($permission && !$role->hasPermissionTo('shipments-delete')){
+        return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+    }
     $shipment = Shipment::with(['items','packages'])->findOrFail($id);
 
     try {
@@ -1021,7 +1228,7 @@ public function shipmentdestroy($id)
 
         // apni listing route par bhej dein (agar hai)
         return redirect()
-            ->route('shipment/index')   // agar listing route nahi, to ->back()
+            ->route('shipment.index')   // agar listing route nahi, to ->back()
             ->with('message', 'Shipment deleted successfully.');
     } catch (\Throwable $e) {
         return back()->with('not_permitted', 'Delete failed: '.$e->getMessage());
@@ -1043,6 +1250,8 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         'currency'              => ['nullable','string','max:10'],   // only if you want to display/record currency text
         'reference'             => ['nullable','string','max:191'],  // label reference (optional)
         'tracking_number'       => ['nullable','string','max:191'],
+        'pickup_date_time'      => ['nullable','date'],
+        'dropoff_date_time'     => ['nullable','date'],
         'notes'                 => ['nullable','string'],
         'rate_amount'           => ['nullable','numeric','min:0'],   // store in rate_breakdown JSON
         'label_format'          => ['nullable','string','max:20'],   // PDF/ZPL/etc
@@ -1065,6 +1274,8 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         'saturday_delivery'    => isset($v['saturday_delivery']) ? (int)$v['saturday_delivery'] : 0,
         'declared_value_total' => $v['declared_value_total'] ?? null,
         'tracking_number'      => $v['tracking_number']      ?? null,
+        'pickup_date_time'     => isset($v['pickup_date_time']) && $v['pickup_date_time'] ? $v['pickup_date_time'] : null,
+        'dropoff_date_time'    => isset($v['dropoff_date_time']) && $v['dropoff_date_time'] ? $v['dropoff_date_time'] : null,
         'label_format'         => $v['label_format']         ?? ($shipment->label_format ?: 'PDF'),
         // If you later want to store the currency text somewhere in meta:
         // 'meta'              => json_encode([...]),
@@ -1074,21 +1285,46 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
     if (array_key_exists('rate_amount', $v) && $v['rate_amount'] !== null) {
         $existing = [];
         if (!empty($shipment->rate_breakdown)) {
-            try { $existing = (array) json_decode($shipment->rate_breakdown, true); } catch (\Throwable $e) {}
+            try { 
+                $existing = is_array($shipment->rate_breakdown) 
+                    ? $shipment->rate_breakdown 
+                    : json_decode($shipment->rate_breakdown, true);
+                if (!is_array($existing)) $existing = [];
+            } catch (\Throwable $e) {
+                $existing = [];
+            }
         }
         $existing['estimated_rate'] = (float)$v['rate_amount'];
         $update['rate_breakdown'] = json_encode($existing);
     }
 
-    // 4) Optionally append notes into comments (so you still retain old comments)
+    // 4) Handle meta fields (currency, reference, notes)
+    $metaData = [];
+    if (!empty($shipment->meta)) {
+        try {
+            $metaData = is_array($shipment->meta) ? $shipment->meta : json_decode($shipment->meta, true);
+        } catch (\Throwable $e) {
+            $metaData = [];
+        }
+    }
+    
+    if (array_key_exists('currency', $v) && $v['currency'] !== null) {
+        $metaData['currency'] = $v['currency'];
+    }
+    if (array_key_exists('reference', $v) && $v['reference'] !== null) {
+        $metaData['reference'] = $v['reference'];
+    }
     if (array_key_exists('notes', $v)) {
         $notes = trim((string)$v['notes']);
         if ($notes !== '') {
+            $metaData['notes'] = $notes;
+            // Also append to comments
             $update['comments'] = trim(($shipment->comments ? ($shipment->comments . "\n\n") : '') . $notes);
-        } else {
-            // If you want to clear comments when notes are blank, uncomment next line:
-            // $update['comments'] = null;
         }
+    }
+    
+    if (!empty($metaData)) {
+        $update['meta'] = json_encode($metaData);
     }
 
     // 5) Persist atomically
@@ -1096,10 +1332,447 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         $shipment->update($update);
     });
 
+    // Return JSON for AJAX requests
+    if ($request->ajax() || $request->wantsJson()) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipping label details updated successfully.',
+            'shipment_id' => $shipment->id
+        ]);
+    }
+
     return redirect()
         ->route('shipment.show', $shipment->id)
         ->with('message', 'Shipping label details updated successfully.');
 }
+
+    public function shipmentUpdateDate(Request $request, \App\Models\Shipment $shipment)
+    {
+        $validated = $request->validate([
+            'created_at' => ['required', 'date'],
+        ]);
+
+        $shipment->created_at = $validated['created_at'];
+        $shipment->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Date updated successfully',
+            'created_at' => $shipment->created_at->format('Y-m-d H:i')
+        ]);
+    }
+
+    public function shipmentProformaInvoice(\App\Models\Shipment $shipment)
+    {
+        $shipment->load(['items.product', 'packages', 'customer', 'currency']);
+        
+        $currencyCode = $shipment->currency->code ?? '$';
+        
+        $data = [
+            'shipment_id' => $shipment->id,
+            'reference_no' => $shipment->reference_no ?? '—',
+            'po_no' => $shipment->po_no ?? '—',
+            'date' => $shipment->created_at->format('d/m/Y'),
+            'status' => $this->getShipmentStatusTextForProforma($shipment->status),
+            'currency_code' => $currencyCode,
+            
+            'customer' => [
+                'name' => $shipment->customer->name ?? '—',
+                'email' => $shipment->customer->email ?? '—',
+                'phone' => $shipment->customer->phone_number ?? '—',
+                'company' => $shipment->customer->company_name ?? '—',
+                'address' => $shipment->customer->address ?? '—',
+            ],
+            
+            'shipper' => [
+                'name' => $shipment->ship_from_first_name ?? '—',
+                'company' => $shipment->ship_from_company ?? '—',
+                'phone' => $shipment->ship_from_contact ?? '—',
+                'email' => $shipment->ship_from_email ?? '—',
+                'address' => implode(', ', array_filter([
+                    $shipment->ship_from_address_1,
+                    $shipment->ship_from_city,
+                    $shipment->ship_from_state,
+                    $shipment->ship_from_zipcode,
+                    $shipment->ship_from_country,
+                ])),
+                'dock_hours' => $shipment->ship_from_dock_hours ?? '—',
+            ],
+            
+            'recipient' => [
+                'name' => $shipment->ship_to_first_name ?? '—',
+                'company' => $shipment->ship_to_company ?? '—',
+                'phone' => $shipment->ship_to_contact ?? '—',
+                'email' => $shipment->ship_to_email ?? '—',
+                'address' => implode(', ', array_filter([
+                    $shipment->ship_to_address_1,
+                    $shipment->ship_to_city,
+                    $shipment->ship_to_state,
+                    $shipment->ship_to_zipcode,
+                    $shipment->ship_to_country,
+                ])),
+                'dock_hours' => $shipment->ship_to_dock_hours ?? '—',
+            ],
+            
+            'items' => $shipment->items,
+            'packages' => $shipment->packages,
+            
+            'totals' => [
+                'items_count' => $shipment->item ?? 0,
+                'total_qty' => $shipment->total_qty ?? 0,
+                'subtotal' => $shipment->total_cost ?? 0,
+                'order_tax' => $shipment->order_tax ?? 0,
+                'order_discount' => $shipment->order_discount ?? 0,
+                'shipping_cost' => $shipment->shipping_cost ?? 0,
+                'grand_total' => $shipment->grand_total ?? 0,
+            ],
+            
+            'comments' => $shipment->comments ?? '',
+        ];
+        
+        $pdf = PDF::loadView('pdf.shipment-proforma', $data)->setPaper('a4', 'portrait');
+        return $pdf->stream("Shipment-{$shipment->id}-Proforma-Invoice.pdf");
+    }
+    
+    private function getShipmentStatusTextForProforma($status)
+    {
+        $statusMap = [
+            1 => 'Pending',
+            2 => 'In Transit',
+            3 => 'Delivered',
+            4 => 'Returned',
+            5 => 'Cancelled',
+        ];
+        return $statusMap[$status] ?? 'Pending';
+    }
+
+    public function shipmentBillOfLadingStore(Request $request, \App\Models\Shipment $shipment)
+    {
+        // 1) Validate inputs
+        $v = $request->validate([
+            'carrier_name' => ['nullable','string','max:255'],
+            'carrier_phone' => ['nullable','string','max:50'],
+            'carrier_address' => ['nullable','string'],
+            'third_party_name' => ['nullable','string','max:255'],
+            'third_party_account' => ['nullable','string','max:100'],
+            'third_party_address' => ['nullable','string'],
+            'pickup_date' => ['nullable','date'],
+            'ready_time' => ['nullable','string','max:50'],
+            'closing_time' => ['nullable','string','max:50'],
+            'shipper_number' => ['nullable','string','max:100'],
+            'quote_number' => ['nullable','string','max:100'],
+            'pro_number' => ['nullable','string','max:100'],
+            'service_type' => ['nullable','string','max:100'],
+            'freight_charge_terms' => ['nullable','string'],
+            'company_logo' => ['nullable','image','mimes:jpg,jpeg,png,gif','max:2048'],
+            'third_party_logo' => ['nullable','image','mimes:jpg,jpeg,png,gif','max:2048'],
+        ]);
+
+        // 2) Get existing meta data
+        $metaData = [];
+        if (!empty($shipment->meta)) {
+            try {
+                $metaData = is_array($shipment->meta) ? $shipment->meta : json_decode($shipment->meta, true);
+            } catch (\Throwable $e) {
+                $metaData = [];
+            }
+        }
+
+        // 3) Store Bill of Lading data in meta
+        $bolData = [
+            'carrier_name' => $v['carrier_name'] ?? null,
+            'carrier_phone' => $v['carrier_phone'] ?? null,
+            'carrier_address' => $v['carrier_address'] ?? null,
+            'third_party_name' => $v['third_party_name'] ?? null,
+            'third_party_account' => $v['third_party_account'] ?? null,
+            'third_party_address' => $v['third_party_address'] ?? null,
+            'pickup_date' => $v['pickup_date'] ?? null,
+            'ready_time' => $v['ready_time'] ?? '12:00',
+            'closing_time' => $v['closing_time'] ?? '04:00',
+            'shipper_number' => $v['shipper_number'] ?? null,
+            'quote_number' => $v['quote_number'] ?? null,
+            'pro_number' => $v['pro_number'] ?? null,
+            'service_type' => $v['service_type'] ?? 'Volume',
+            'freight_charge_terms' => $v['freight_charge_terms'] ?? 'Freight Charges Are Prepaid',
+        ];
+
+        // 4) Handle logo uploads
+        if ($request->hasFile('company_logo')) {
+            $logo = $request->file('company_logo');
+            $logoName = 'bol_company_' . $shipment->id . '_' . time() . '.' . $logo->getClientOriginalExtension();
+            $logo->move(public_path('uploads/bill-of-lading'), $logoName);
+            $bolData['company_logo'] = 'uploads/bill-of-lading/' . $logoName;
+        }
+
+        if ($request->hasFile('third_party_logo')) {
+            $logo = $request->file('third_party_logo');
+            $logoName = 'bol_thirdparty_' . $shipment->id . '_' . time() . '.' . $logo->getClientOriginalExtension();
+            $logo->move(public_path('uploads/bill-of-lading'), $logoName);
+            $bolData['third_party_logo'] = 'uploads/bill-of-lading/' . $logoName;
+        }
+
+        // 5) Merge into meta
+        $metaData['bill_of_lading'] = $bolData;
+
+        // 6) Save to database
+        DB::transaction(function () use ($shipment, $metaData) {
+            $shipment->update(['meta' => json_encode($metaData)]);
+        });
+
+        // 7) Return JSON for AJAX or redirect
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Bill of Lading information saved successfully.',
+                'pdf_url' => route('shipment.bill-of-lading', $shipment->id)
+            ]);
+        }
+
+        return redirect()
+            ->route('shipment.bill-of-lading', $shipment->id)
+            ->with('message', 'Bill of Lading information saved successfully.');
+    }
+
+    public function shipmentBillOfLading(Request $request, \App\Models\Shipment $shipment)
+    {   
+        $shipment->load(['items.product', 'packages', 'customer', 'currency']);
+        
+        // Get General Setting for company logo
+        $generalSetting = GeneralSetting::latest()->first();
+        $companyLogoPath = null;
+        if ($generalSetting && $generalSetting->site_logo) {
+            $logoFile = public_path('logo/' . $generalSetting->site_logo);
+            if (file_exists($logoFile)) {
+                $companyLogoPath = asset('logo/' . $generalSetting->site_logo);
+            }
+        }
+        
+        // Fallback to images/logo.webp if no logo found
+        if (empty($companyLogoPath)) {
+            $fallbackLogo = public_path('images/logo.webp');
+            if (file_exists($fallbackLogo)) {
+                $companyLogoPath = asset('images/logo.webp');
+            }
+        }
+        
+        // Get Bill of Lading data from meta JSON
+        $safeJson = function ($val) {
+            if (empty($val)) return [];
+            try {
+                return is_array($val) ? $val : json_decode($val, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\Throwable $e) {
+                return [];
+            }
+        };
+        
+        $metaData = $safeJson($shipment->meta);
+        $bolData = $metaData['bill_of_lading'] ?? [];
+        
+        // Use saved data or defaults
+        $carrierName = $bolData['carrier_name'] ?? '';
+        $carrierPhone = $bolData['carrier_phone'] ?? '';
+        $carrierAddress = $bolData['carrier_address'] ?? '';
+        $thirdPartyName = $bolData['third_party_name'] ?? '';
+        $thirdPartyAccount = $bolData['third_party_account'] ?? '';
+        $thirdPartyAddress = $bolData['third_party_address'] ?? '';
+        $pickupDate = $bolData['pickup_date'] ?? $shipment->created_at->format('Y-m-d');
+        $readyTime = $bolData['ready_time'] ?? '12:00';
+        $closingTime = $bolData['closing_time'] ?? '04:00';
+        $shipperNumber = $bolData['shipper_number'] ?? $shipment->po_no ?? '';
+        $quoteNumber = $bolData['quote_number'] ?? $shipment->reference_no ?? '';
+        $proNumber = $bolData['pro_number'] ?? '';
+        $serviceType = $bolData['service_type'] ?? 'Volume';
+        $freightChargeTerms = $bolData['freight_charge_terms'] ?? 'Freight Charges Are Prepaid';
+        
+        // Use uploaded logos or fallback to company logo from settings
+        $companyLogo = $bolData['company_logo'] ?? $companyLogoPath;
+        if ($companyLogo && !filter_var($companyLogo, FILTER_VALIDATE_URL) && !str_starts_with($companyLogo, 'http')) {
+            $companyLogo = asset($companyLogo);
+        }
+        
+        $thirdPartyLogo = $bolData['third_party_logo'] ?? null;
+        if ($thirdPartyLogo && !filter_var($thirdPartyLogo, FILTER_VALIDATE_URL) && !str_starts_with($thirdPartyLogo, 'http')) {
+            $thirdPartyLogo = asset($thirdPartyLogo);
+        }
+        
+        // Generate BOL Number (using shipment ID or reference)
+        $bolNumber = $shipment->reference_no ?? str_pad($shipment->id, 7, '0', STR_PAD_LEFT);
+        
+        // Generate Pro Number if not provided
+        if (empty($proNumber)) {
+            $proNumber = str_pad($shipment->id, 9, '0', STR_PAD_LEFT);
+        }
+        
+        $data = [
+            'shipment_id' => $shipment->id,
+            'bol_number' => $bolNumber,
+            'pro_number' => $proNumber,
+            
+            'carrier' => [
+                'name' => $carrierName,
+                'phone' => $carrierPhone,
+                'address' => $carrierAddress,
+            ],
+            
+            'third_party' => [
+                'name' => $thirdPartyName,
+                'account' => $thirdPartyAccount,
+                'address' => $thirdPartyAddress,
+            ],
+            
+            'logos' => [
+                'company_logo' => $companyLogo,
+                'third_party_logo' => $thirdPartyLogo,
+            ],
+            
+            'shipper' => [
+                'name' => $shipment->ship_from_first_name ?? '—',
+                'company' => $shipment->ship_from_company ?? '—',
+                'contact' => $shipment->ship_from_contact ?? '—',
+                'contact_person' => $shipment->ship_from_first_name ?? '—',
+                'address' => $shipment->ship_from_address_1 ?? '—',
+                'city' => $shipment->ship_from_city ?? '—',
+                'state' => $shipment->ship_from_state ?? '—',
+                'zipcode' => $shipment->ship_from_zipcode ?? '—',
+                'country' => $shipment->ship_from_country ?? '—',
+                'email' => $shipment->ship_from_email ?? '—',
+                'pickup_hours' => $shipment->ship_from_dock_hours ?? '—',
+                'lunch_hour' => $shipment->ship_from_lunch_hour ?? '—',
+                'pickup_delivery_instructions' => $shipment->ship_from_pickup_delivery_instructions ?? '—',
+                'appointment' => $shipment->ship_from_appointment ?? '—',
+                'accessorial' => $shipment->ship_from_accessorial ?? '—',
+            ],
+            
+            'consignee' => [
+                'name' => $shipment->ship_to_first_name ?? '—',
+                'company' => $shipment->ship_to_company ?? '—',
+                'contact' => $shipment->ship_to_contact ?? '—',
+                'address' => $shipment->ship_to_address_1 ?? '—',
+                'city' => $shipment->ship_to_city ?? '—',
+                'state' => $shipment->ship_to_state ?? '—',
+                'zipcode' => $shipment->ship_to_zipcode ?? '—',
+                'country' => $shipment->ship_to_country ?? '—',
+                'email' => $shipment->ship_to_email ?? '—',
+                'delivery_hours' => $shipment->ship_to_dock_hours ?? '—',
+                'lunch_hour' => $shipment->ship_to_lunch_hour ?? '—',
+                'pickup_delivery_instructions' => $shipment->ship_to_pickup_delivery_instructions ?? '—',
+                'appointment' => $shipment->ship_to_appointment ?? '—',
+                'accessorial' => $shipment->ship_to_accessorial ?? '—',
+            ],
+            
+            'reference_info' => [
+                'shipper_number' => $shipperNumber ?: '—',
+                'po_number' => $shipment->po_no ?? '—',
+                'quote_number' => $quoteNumber ?: '—',
+                'customer_number' => $shipment->customer_id ?? '—',
+                'bol_number' => $bolNumber,
+            ],
+            
+            'packages' => $shipment->packages,
+            'total_units' => $shipment->packages->sum('qty') ?? 0,
+            'total_weight' => $shipment->packages->sum(function($pkg) {
+                return ($pkg->qty ?? 1) * ($pkg->weight ?? 0);
+            }) ?? 0,
+            
+            'pickup_date' => \Carbon\Carbon::parse($pickupDate)->format('m/d/y'),
+            'ready_time' => $readyTime,
+            'closing_time' => $closingTime,
+            'service_type' => $serviceType,
+            
+            'freight_charge_terms' => $freightChargeTerms,
+            'comments' => $shipment->comments ?? '—',
+        ];
+        
+        $pdf = PDF::loadView('pdf.bill-of-lading', $data)->setPaper('a4', 'portrait');
+        return $pdf->stream("Bill-Of-Lading-{$shipment->id}.pdf");
+    }
+
+    public function shipmentPortalLabelPdf(\App\Models\Shipment $shipment)
+    {
+        $shipment->load(['items.product', 'packages', 'customer']);
+        
+        // Safe JSON decode helper
+        $safeJson = function ($val) {
+            if (empty($val)) return null;
+            try {
+                return is_array($val) ? $val : json_decode($val, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+        
+        $rateBreakdown = $safeJson($shipment->rate_breakdown);
+        $meta = $safeJson($shipment->meta);
+        
+        $data = [
+            'shipment_id' => $shipment->id,
+            'reference_no' => $shipment->reference_no ?? '—',
+            'po_no' => $shipment->po_no ?? '—',
+            'date' => $shipment->created_at->format('d/m/Y'),
+            
+            'label' => [
+                'provider' => strtoupper($shipment->provider ?? '—'),
+                'service_code' => $shipment->service_code ?? '—',
+                'service_name' => $shipment->service_name ?? '—',
+                'tracking_number' => $shipment->tracking_number ?? '—',
+                'label_format' => $shipment->label_format ?? 'PDF',
+                'payer' => $shipment->payer == 'shipper' ? 'Shipper' : ($shipment->payer == 'receiver' ? 'Receiver' : ($shipment->payer == 'third_party' ? 'Third Party' : '—')),
+                'account_number' => $shipment->account_number ?? '—',
+                'signature_option' => $shipment->signature_option == 'direct' ? 'Direct' : ($shipment->signature_option == 'adult' ? 'Adult' : '—'),
+                'saturday_delivery' => $shipment->saturday_delivery ? 'Yes' : 'No',
+                'declared_value_total' => $shipment->declared_value_total ?? 0,
+                'pickup_date_time' => $shipment->pickup_date_time ? \Carbon\Carbon::parse($shipment->pickup_date_time)->format('Y-m-d H:i') : '—',
+                'dropoff_date_time' => $shipment->dropoff_date_time ? \Carbon\Carbon::parse($shipment->dropoff_date_time)->format('Y-m-d H:i') : '—',
+            ],
+            
+            'shipper' => [
+                'name' => $shipment->ship_from_first_name ?? '—',
+                'company' => $shipment->ship_from_company ?? '—',
+                'phone' => $shipment->ship_from_contact ?? '—',
+                'email' => $shipment->ship_from_email ?? '—',
+                'address' => implode(', ', array_filter([
+                    $shipment->ship_from_address_1,
+                    $shipment->ship_from_city,
+                    $shipment->ship_from_state,
+                    $shipment->ship_from_zipcode,
+                    $shipment->ship_from_country,
+                ])),
+                'dock_hours' => $shipment->ship_from_dock_hours ?? '—',
+            ],
+            
+            'recipient' => [
+                'name' => $shipment->ship_to_first_name ?? '—',
+                'company' => $shipment->ship_to_company ?? '—',
+                'phone' => $shipment->ship_to_contact ?? '—',
+                'email' => $shipment->ship_to_email ?? '—',
+                'address' => implode(', ', array_filter([
+                    $shipment->ship_to_address_1,
+                    $shipment->ship_to_city,
+                    $shipment->ship_to_state,
+                    $shipment->ship_to_zipcode,
+                    $shipment->ship_to_country,
+                ])),
+                'dock_hours' => $shipment->ship_to_dock_hours ?? '—',
+            ],
+            
+            'packages' => $shipment->packages,
+            'items' => $shipment->items,
+            
+            'meta' => [
+                'currency' => $meta['currency'] ?? '—',
+                'reference' => $meta['reference'] ?? '—',
+                'notes' => $meta['notes'] ?? '—',
+            ],
+            
+            'rate' => [
+                'amount' => $rateBreakdown['estimated_rate'] ?? $rateBreakdown['amount'] ?? null,
+                'currency' => $meta['currency'] ?? '',
+            ],
+        ];
+        
+        $pdf = PDF::loadView('pdf.portal-shipping-label', $data)->setPaper('a4', 'portrait');
+        return $pdf->stream("Portal-Shipping-Label-{$shipment->id}.pdf");
+    }
 
     public function create()
     {
@@ -2144,12 +2817,27 @@ private function imeiExists(string $imei, int $productId): bool
         $payment_status = $request->input('payment_status');
 
         $isCustomer = Auth::user()->role_id == 5;
+        
+        // Get customer IDs for logged-in user (if customer role)
+        $customerIdsForUser = [];
+        if ($isCustomer) {
+            $customerIdsForUser = Customer::where('user_id', Auth::id())->pluck('id')->toArray();
+            if (empty($customerIdsForUser)) {
+                // If no customer record found, return empty result
+                return response()->json([
+                    'draw' => intval($request->draw ?? 1),
+                    'recordsTotal' => 0,
+                    'recordsFiltered' => 0,
+                    'data' => []
+                ]);
+            }
+        }
 
         $q = Purchase::whereDate('created_at', '>=' ,$request->input('starting_date'))->whereDate('created_at', '<=' ,$request->input('ending_date'));
         //check staff access
         $this->staffAccessCheck($q);
         if ($isCustomer) {
-            $q = $q->where('user_id', Auth::id());
+            $q = $q->whereIn('customer_id', $customerIdsForUser);
         }
         if($warehouse_id)
             $q = $q->where('warehouse_id', $warehouse_id);
@@ -2191,7 +2879,7 @@ private function imeiExists(string $imei, int $productId): bool
 
             $this->staffAccessCheck($q);
             if ($isCustomer) {
-                $q = $q->where('user_id', Auth::id());
+                $q = $q->whereIn('customer_id', $customerIdsForUser);
             }
             if($warehouse_id)
                 $q = $q->where('warehouse_id', $warehouse_id);
@@ -2215,64 +2903,86 @@ private function imeiExists(string $imei, int $productId): bool
                 ->orderBy($order,$dir);
 
             if ($isCustomer) {
-                $q = $q->where('purchases.user_id', Auth::id());
+                $q = $q->whereIn('purchases.customer_id', $customerIdsForUser);
             }
 
             if(Auth::user()->role_id > 2 && config('staff_access') == 'own') {
                 $q =  $q->with('supplier', 'warehouse','wproduction'
-            )
-                        ->where('purchases.user_id', Auth::id())
-                        ->orwhere([
-                            ['purchases.reference_no', 'LIKE', "%{$search}%"],
-                            ['purchases.user_id', Auth::id()]
-                        ])
-                        ->orwhere([
-                            ['suppliers.name', 'LIKE', "%{$search}%"],
-                            ['purchases.user_id', Auth::id()]
-                        ])
-                        ->orwhere([
-                            ['product_purchases.imei_number', 'LIKE', "%{$search}%"],
-                            ['purchases.user_id', Auth::id()]
-                        ]);
+            );
+                if ($isCustomer) {
+                    $q = $q->whereIn('purchases.customer_id', $customerIdsForUser);
+                } else {
+                    $q = $q->where('purchases.user_id', Auth::id());
+                }
+                $q = $q->where(function($query) use ($search, $isCustomer, $customerIdsForUser) {
+                    $query->where('purchases.reference_no', 'LIKE', "%{$search}%")
+                          ->orwhere('purchases.po_no', 'LIKE', "%{$search}%")
+                          ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
+                          ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+                    if ($isCustomer) {
+                        $query->whereIn('purchases.customer_id', $customerIdsForUser);
+                    } else {
+                        $query->where('purchases.user_id', Auth::id());
+                    }
+                });
                 foreach ($field_names as $key => $field_name) {
-                    $q = $q->orwhere([
-                            ['purchases.user_id', Auth::id()],
-                            ['purchases.' . $field_name, 'LIKE', "%{$search}%"]
-                        ]);
+                    $q = $q->orwhere(function($query) use ($field_name, $search, $isCustomer, $customerIdsForUser) {
+                        $query->where('purchases.' . $field_name, 'LIKE', "%{$search}%");
+                        if ($isCustomer) {
+                            $query->whereIn('purchases.customer_id', $customerIdsForUser);
+                        } else {
+                            $query->where('purchases.user_id', Auth::id());
+                        }
+                    });
                 }
             }
             elseif(Auth::user()->role_id > 2 && config('staff_access') == 'warehouse') {
                 $q =  $q->with('supplier', 'warehouse','wproduction'
-            )
-                ->where('purchases.user_id', Auth::id())
-                ->orwhere([
-                    ['purchases.reference_no', 'LIKE', "%{$search}%"],
-                    ['purchases.warehouse_id', Auth::user()->warehouse_id]
-                ])
-                ->orwhere([
-                    ['suppliers.name', 'LIKE', "%{$search}%"],
-                    ['purchases.warehouse_id', Auth::user()->warehouse_id]
-                ])
-                ->orwhere([
-                    ['product_purchases.imei_number', 'LIKE', "%{$search}%"],
-                    ['purchases.warehouse_id', Auth::user()->warehouse_id]
-                ]);
+            );
+                if ($isCustomer) {
+                    $q = $q->whereIn('purchases.customer_id', $customerIdsForUser);
+                } else {
+                    $q = $q->where('purchases.user_id', Auth::id());
+                }
+                $q = $q->where(function($query) use ($search, $isCustomer, $customerIdsForUser) {
+                    $query->where('purchases.reference_no', 'LIKE', "%{$search}%")
+                          ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
+                          ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+                    if ($isCustomer) {
+                        $query->whereIn('purchases.customer_id', $customerIdsForUser);
+                    } else {
+                        $query->where('purchases.warehouse_id', Auth::user()->warehouse_id);
+                    }
+                });
                 foreach ($field_names as $key => $field_name) {
-                    $q = $q->orwhere([
-                        ['purchases.warehouse_id', Auth::user()->warehouse_id],
-                        ['purchases.' . $field_name, 'LIKE', "%{$search}%"]
-                    ]);
+                    $q = $q->orwhere(function($query) use ($field_name, $search, $isCustomer, $customerIdsForUser) {
+                        $query->where('purchases.' . $field_name, 'LIKE', "%{$search}%");
+                        if ($isCustomer) {
+                            $query->whereIn('purchases.customer_id', $customerIdsForUser);
+                        } else {
+                            $query->where('purchases.warehouse_id', Auth::user()->warehouse_id);
+                        }
+                    });
                 }
             }
             else {
                 $q = $q->with('supplier', 'warehouse','wproduction'
-            )
-                    ->orwhere('purchases.reference_no', 'LIKE', "%{$search}%")
-                    ->orwhere('purchases.po_no', 'LIKE', "%{$search}%")
-                    ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
-                    ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+            );
                 if ($isCustomer) {
-                    $q = $q->whereIn('purchases.customer_id', $customerIdsForUser);
+                    $q = $q->whereIn('purchases.customer_id', $customerIdsForUser)
+                          ->where(function($query) use ($search) {
+                              $query->where('purchases.reference_no', 'LIKE', "%{$search}%")
+                                    ->orwhere('purchases.po_no', 'LIKE', "%{$search}%")
+                                    ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
+                                    ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+                          });
+                } else {
+                    $q = $q->where(function($query) use ($search) {
+                        $query->where('purchases.reference_no', 'LIKE', "%{$search}%")
+                              ->orwhere('purchases.po_no', 'LIKE', "%{$search}%")
+                              ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
+                              ->orwhere('product_purchases.imei_number', 'LIKE', "%{$search}%");
+                    });
                 }
                 foreach ($field_names as $key => $field_name) {
                     $q = $q->orwhere('purchases.' . $field_name, 'LIKE', "%{$search}%");
@@ -2321,7 +3031,7 @@ private function imeiExists(string $imei, int $productId): bool
                 $purchase_status = __('db.Ordered');
                 }
                 elseif ($purchase->status == 5) {
-                $nestedData['purchase_status'] = '<div class="badge badge-primary">'.__('db.In Process').'</div>';
+                $nestedData['purchase_status'] = '<div class="badge badge-primary">'.__('In Process').'</div>';
                 $purchase_status = __('In Process');
                 }
                 elseif ($purchase->status == 6) {
@@ -2329,7 +3039,7 @@ private function imeiExists(string $imei, int $productId): bool
                 $purchase_status = __('Cancel');
                 }
                 elseif ($purchase->status == 7) {
-                $nestedData['purchase_status'] = '<div class="badge badge-success">'.__('db.Complete').'</div>';
+                $nestedData['purchase_status'] = '<div class="badge badge-success">'.__('Complete').'</div>';
                 $purchase_status = __('Complete');
                 }
 
@@ -2938,7 +3648,7 @@ public function ShippedCheck(Request $request)
     $userId = auth()->id(); // Or set a default user ID if needed
 
     // Check existing shipped products for this purchase
-    $existing = DB::table('PurchaseShippeds')
+    $existing = DB::table('purchaseshippeds')
         ->where('purchase_id', $request->purchase_id)
         ->whereIn('product_id', $request->product_ids)
         ->pluck('product_id')
@@ -2965,7 +3675,7 @@ public function ShippedCheck(Request $request)
         ];
     }
 
-    DB::table('PurchaseShippeds')->insert($insertData);
+    DB::table('purchaseshippeds')->insert($insertData);
 
     return response()->json([
         'message' => 'Shipment records saved successfully.',
@@ -3080,8 +3790,8 @@ public function getShippedData(Request $request)
         3 => 'created_at',
     ];
 
-    // Original query with relations
-    $q = PurchaseShipped::with(['supplier', 'purchase', 'user', 'product.unit', 'Courier']);
+    // Original query with relations - include customer relation
+    $q = PurchaseShipped::with(['supplier', 'purchase.customer', 'user', 'product.unit', 'Courier']);
 
     // Filters
     if ($request->starting_date) {
@@ -3176,24 +3886,47 @@ public function getShippedData(Request $request)
                 ];
             });
 
-        $status = $statusLabels[$item->ship_status] ?? ['text' => 'Unknown', 'class' => 'light'];
+        // Fix: Use ship_status (database field name)
+        $statusValue = $item->ship_status ?? 0;
+        $status = $statusLabels[$statusValue] ?? ['text' => 'Unknown', 'class' => 'light'];
+
+        // Fix: Get customer from purchase, not from user
+        $customerName = '';
+        $customerCompany = '';
+        if($item->purchase && $item->purchase->customer_id) {
+            $customer = \App\Models\Customer::find($item->purchase->customer_id);
+            $customerName = $customer->name ?? '';
+            $customerCompany = $customer->company_name ?? '';
+        }
+
+        // Get supplier company name
+        $supplierCompany = $item->supplier->company_name ?? '';
+
+        // Generate tracking link based on courier
+        $courierName = $item->Courier->name ?? '';
+        $trackingNumber = $item->tracking_number ?? '';
+        $trackingLink = $this->generateTrackingLink($courierName, $trackingNumber);
 
         $data[] = [
             'po_no'           => $item->purchase->po_no ?? '',
             'reference_no'    => $item->purchase->reference_no ?? '',
             'supplier_name'   => $item->supplier->name ?? '',
-            'customer_name'   => $item->user->name ?? '',
+            'supplier_company' => $supplierCompany,
+            'customer_name'   => $customerName,
+            'customer_company' => $customerCompany,
             'date'            => $item->created_at->format('Y-m-d'),
             'ship_cost'       => number_format($totalShipCost, config('decimal')),
             'shipment_status' => '<span class="badge badge-' . $status['class'] . '">' . $status['text'] . '</span>',
-            'courier'         => $item->Courier->name ?? '',
-            'tracking_number' => "<a href='https://www.ups.com/track?track=yes&trackNums=".$item->tracking_number."&loc=en_US&requester=ST/trackdetails' target='_blank'> ".$item->tracking_number."</a>",
+            'courier'         => $courierName,
+            'tracking_number' => $trackingLink,
+            'notes'           => $item->notes,
             'options'         => '<button class="btn btn-sm btn-info view-details" data-purchase="'.$item->purchase_id.'" data-supplier="'.$item->supplier_id.'"><i class="fa fa-eye"></i></button> 
                 <button class="btn btn-sm btn-warning edit-shipment" 
                     data-id="'.$item->id.'" 
-                    data-status="'.$item->ship_status.'" 
+                    data-status="'.$statusValue.'" 
                     data-courier="'.$item->courier_id.'" 
-                    data-tracking="'.$item->tracking_number.'">
+                    data-tracking="'.$item->tracking_number.'"
+                    data-notes="'.$item->notes.'">
                     <i class="fa fa-edit"></i>
                 </button>',
             'products_data'   => $products,
@@ -3212,7 +3945,86 @@ public function getShippedData(Request $request)
     ]);
 }
 
+/**
+ * Generate tracking link based on courier name
+ */
+private function generateTrackingLink($courierName, $trackingNumber)
+{
+    if (empty($trackingNumber)) {
+        return '<span class="text-muted">—</span>';
+    }
 
+    $courierNameLower = strtolower(trim($courierName));
+    
+    // Remove common prefixes/suffixes and normalize
+    $courierNameLower = preg_replace('/\s+/', '', $courierNameLower);
+    
+    $trackingUrl = null;
+    
+    // UPS
+    if (strpos($courierNameLower, 'ups') !== false) {
+        $trackingUrl = "https://www.ups.com/track?track=yes&trackNums=" . urlencode($trackingNumber) . "&loc=en_US&requester=ST/trackdetails";
+    }
+    // FedEx / Federal Express
+    elseif (strpos($courierNameLower, 'fedex') !== false || strpos($courierNameLower, 'federalexpress') !== false) {
+        $trackingUrl = "https://www.fedex.com/fedextrack/?tracknumbers=" . urlencode($trackingNumber);
+    }
+    // DHL
+    elseif (strpos($courierNameLower, 'dhl') !== false) {
+        $trackingUrl = "https://www.dhl.com/global-en/home/tracking/tracking-express.html?tracking-id=" . urlencode($trackingNumber);
+    }
+    // USPS
+    elseif (strpos($courierNameLower, 'usps') !== false || strpos($courierNameLower, 'unitedstatespostalservice') !== false) {
+        $trackingUrl = "https://tools.usps.com/go/TrackConfirmAction?tLabels=" . urlencode($trackingNumber);
+    }
+    // TNT
+    elseif (strpos($courierNameLower, 'tnt') !== false) {
+        $trackingUrl = "https://www.tnt.com/express/en_gb/site/shipping-tools/tracking.html?searchType=con&cons=" . urlencode($trackingNumber);
+    }
+    // Aramex
+    elseif (strpos($courierNameLower, 'aramex') !== false) {
+        $trackingUrl = "https://www.aramex.com/track/results?ShipmentNumber=" . urlencode($trackingNumber);
+    }
+    // TCS / TCS Express
+    elseif (strpos($courierNameLower, 'tcs') !== false) {
+        $trackingUrl = "https://www.tcsexpress.com/track/" . urlencode($trackingNumber);
+    }
+    // Leopard / Leopard Courier
+    elseif (strpos($courierNameLower, 'leopard') !== false) {
+        $trackingUrl = "https://www.leopardscourier.com/track/" . urlencode($trackingNumber);
+    }
+    // M&P / M&P Express
+    elseif (strpos($courierNameLower, 'm&p') !== false || strpos($courierNameLower, 'mp') !== false) {
+        $trackingUrl = "https://www.mandpexpress.com/track/" . urlencode($trackingNumber);
+    }
+    // Call Courier
+    elseif (strpos($courierNameLower, 'callcourier') !== false || strpos($courierNameLower, 'call') !== false) {
+        $trackingUrl = "https://www.callcourier.com.pk/track/" . urlencode($trackingNumber);
+    }
+    // Trax / Trax Courier
+    elseif (strpos($courierNameLower, 'trax') !== false) {
+        $trackingUrl = "https://www.traxcourier.com/track/" . urlencode($trackingNumber);
+    }
+    // BlueEx
+    elseif (strpos($courierNameLower, 'blueex') !== false || strpos($courierNameLower, 'blue') !== false) {
+        $trackingUrl = "https://www.blueex.com.pk/track/" . urlencode($trackingNumber);
+    }
+    // Skynet
+    elseif (strpos($courierNameLower, 'skynet') !== false) {
+        $trackingUrl = "https://www.skynetworldwide.com/track/" . urlencode($trackingNumber);
+    }
+    // Default: If courier not recognized, show tracking number as plain text or generic link
+    else {
+        // You can add a generic tracking search or just show the number
+        return '<span class="text-primary" title="Tracking Number">' . htmlspecialchars($trackingNumber) . '</span>';
+    }
+    
+    if ($trackingUrl) {
+        return '<a href="' . htmlspecialchars($trackingUrl) . '" target="_blank" class="text-primary" title="Track on ' . htmlspecialchars($courierName) . '">' . htmlspecialchars($trackingNumber) . ' <i class="fa fa-external-link"></i></a>';
+    }
+    
+    return '<span class="text-primary">' . htmlspecialchars($trackingNumber) . '</span>';
+}
 
 public function childDetails(Request $request)
 {
@@ -3247,16 +4059,18 @@ public function childDetails(Request $request)
  public function shippmnetUpdate(Request $request)
 {
     $request->validate([
-        'id' => 'required|exists:PurchaseShippeds,id',
+        'id' => 'required|exists:purchaseshippeds,id',
         'shipment_status' => 'required|in:0,1,2,3,4,5,6',
         'carrier_id' => 'nullable|exists:couriers,id',
         'tracking_number' => 'nullable|string|max:255',
+        'notes' => 'nullable|string',
     ]);
 
     $shipment = PurchaseShipped::findOrFail($request->id);
     $shipment->ship_status = $request->shipment_status;
     $shipment->courier_id = $request->carrier_id;
     $shipment->tracking_number = $request->tracking_number;
+    $shipment->notes = $request->notes;
     $shipment->save();
 
     return response()->json(['success' => true]);
@@ -3267,12 +4081,13 @@ public function shipmentModal(Request $request)
     $purchaseId = $request->purchase_id;
     $supplierId = $request->supplier_id;
 
-    $purchase = Purchase::with(['warehouse', 'wproduction', 'supplier'])->find($purchaseId);
+    $purchase = Purchase::with(['warehouse', 'wproduction', 'supplier', 'customer'])->find($purchaseId);
     $shipment = PurchaseShipped::with(['courier', 'customer'])->where('purchase_id', $purchaseId)
         ->where('supplier_id', $supplierId)
         ->first();
 
-    $customer = Customer::find($purchase->customer_id);
+    // Fix: Get customer from purchase relationship or directly
+    $customer = $purchase->customer ?? ($purchase->customer_id ? Customer::find($purchase->customer_id) : null);
     $warehouse = $purchase->warehouse;
 
     $products = ProductPurchase::with(['product', 'purchase_unit']) // 👈 use purchase_unit here
@@ -3287,12 +4102,12 @@ public function shipmentModal(Request $request)
         <div class="col-md-6">
             <h6><strong>Customer Info:</strong></h6>
             <p>
-                <strong>Name:</strong> <?= $customer->name ?? '-' ?><br>
-                <strong>Email:</strong> <?= $customer->email ?? '-' ?><br>
-                <strong>Phone:</strong> <?= $customer->phone_number ?? '-' ?><br>
-                <strong>Company:</strong> <?= $customer->company_name ?? '-' ?><br>
-                <strong>Address:</strong> <?= $customer->address ?? '-' ?><br>
-                <strong>Website:</strong> <?= $customer->website ?? '-' ?>
+                <strong>Name:</strong> <?= ($customer && $customer->name) ? $customer->name : '-' ?><br>
+                <strong>Email:</strong> <?= ($customer && $customer->email) ? $customer->email : '-' ?><br>
+                <strong>Phone:</strong> <?= ($customer && $customer->phone_number) ? $customer->phone_number : '-' ?><br>
+                <strong>Company:</strong> <?= ($customer && $customer->company_name) ? $customer->company_name : '-' ?><br>
+                <strong>Address:</strong> <?= ($customer && $customer->address) ? $customer->address : '-' ?><br>
+                <strong>Website:</strong> <?= ($customer && $customer->website) ? $customer->website : '-' ?>
             </p>
         </div>
 
@@ -3314,7 +4129,8 @@ public function shipmentModal(Request $request)
             <p>
                 <strong>Courier:</strong> <?= $shipment->courier->name ?? '-' ?><br>
                 <strong>Tracking No:</strong> <?= $shipment->tracking_number ?? '-' ?><br>
-                <strong>Status:</strong> <?= $this->shipmentStatusText($shipment->ship_status ?? 0) ?>
+                <strong>Status:</strong> <?= $this->getShipmentStatusText($shipment->ship_status ?? 0) ?><br>
+                <strong>Notes:</strong> <?= $shipment->notes ?? '-' ?>
             </p>
         </div>
         <div class="col-md-6">
@@ -3385,6 +4201,20 @@ private function getPurchaseStatusText($status)
         case 3: return 'Pending';
         default: return 'Ordered';
     }
+}
+
+private function getShipmentStatusText($status)
+{
+    $statusLabels = [
+        0 => 'Pending',
+        1 => 'Processing',
+        2 => 'Packed',
+        3 => 'Dispatched',
+        4 => 'In Transit',
+        5 => 'Delivered',
+        6 => 'Failed',
+    ];
+    return $statusLabels[$status] ?? 'Unknown';
 }
    
 //     public function update(UpdatePurchaseRequest $request, $id)

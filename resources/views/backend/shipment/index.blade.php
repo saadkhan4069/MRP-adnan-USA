@@ -102,8 +102,42 @@
 
   function formatDetails(row) {
     const d = row;
-    const addrFrom = `<div><strong>From:</strong> ${d.from || '—'}</div>`;
-    const addrTo   = `<div><strong>To:</strong> ${d.to || '—'}</div>`;
+    let fromDetails = `<div><strong>From:</strong> ${d.from || '—'}</div>`;
+    if (d.ship_from_dock_hours && d.ship_from_dock_hours !== '—') {
+      fromDetails += `<div class="mt-1"><strong>Dock Hours:</strong> ${d.ship_from_dock_hours}</div>`;
+    }
+    if (d.ship_from_lunch_hour && d.ship_from_lunch_hour !== '—') {
+      fromDetails += `<div class="mt-1"><strong>Lunch Hour:</strong> ${d.ship_from_lunch_hour}</div>`;
+    }
+    if (d.ship_from_pickup_delivery_instructions && d.ship_from_pickup_delivery_instructions !== '—') {
+      fromDetails += `<div class="mt-1"><strong>Pick up / Delivery Instructions:</strong> ${d.ship_from_pickup_delivery_instructions}</div>`;
+    }
+    if (d.ship_from_appointment && d.ship_from_appointment !== '—') {
+      fromDetails += `<div class="mt-1"><strong>Appointment:</strong> ${d.ship_from_appointment}</div>`;
+    }
+    if (d.ship_from_accessorial && d.ship_from_accessorial !== '—') {
+      fromDetails += `<div class="mt-1"><strong>Accessorial:</strong> ${d.ship_from_accessorial}</div>`;
+    }
+    
+    let toDetails = `<div><strong>To:</strong> ${d.to || '—'}</div>`;
+    if (d.ship_to_dock_hours && d.ship_to_dock_hours !== '—') {
+      toDetails += `<div class="mt-1"><strong>Dock Hours:</strong> ${d.ship_to_dock_hours}</div>`;
+    }
+    if (d.ship_to_lunch_hour && d.ship_to_lunch_hour !== '—') {
+      toDetails += `<div class="mt-1"><strong>Lunch Hour:</strong> ${d.ship_to_lunch_hour}</div>`;
+    }
+    if (d.ship_to_pickup_delivery_instructions && d.ship_to_pickup_delivery_instructions !== '—') {
+      toDetails += `<div class="mt-1"><strong>Pick up / Delivery Instructions:</strong> ${d.ship_to_pickup_delivery_instructions}</div>`;
+    }
+    if (d.ship_to_appointment && d.ship_to_appointment !== '—') {
+      toDetails += `<div class="mt-1"><strong>Appointment:</strong> ${d.ship_to_appointment}</div>`;
+    }
+    if (d.ship_to_accessorial && d.ship_to_accessorial !== '—') {
+      toDetails += `<div class="mt-1"><strong>Accessorial:</strong> ${d.ship_to_accessorial}</div>`;
+    }
+    
+    const addrFrom = fromDetails;
+    const addrTo = toDetails;
 
     let pkgRows = '';
     (d.packages||[]).forEach((p, i) => {
@@ -114,19 +148,23 @@
         <tr>
           <td>${i+1}</td>
           <td>${p.packaging || '—'}</td>
+          <td>${p.qty || 1}</td>
+          <td>${p.package_class || '—'}</td>
+          <td>${p.package_nmfc || '—'}</td>
+          <td>${p.commodity_name || '—'}</td>
           <td>${wt}</td>
           <td>${dim ? (dim + ' ' + dimUnit) : '—'}</td>
           <td class="text-end">${currency(p.declared_value)}</td>
         </tr>`;
     });
-    if(!pkgRows) pkgRows = `<tr><td colspan="5" class="text-muted">No packages</td></tr>`;
+    if(!pkgRows) pkgRows = `<tr><td colspan="9" class="text-muted">No packages</td></tr>`;
 
     const packagesTable = `
       <div class="mt-2">
         <div class="fw-bold mb-1">Packages</div>
         <table class="table table-bordered table-sm mb-0">
           <thead><tr>
-            <th>#</th><th>Packaging</th><th>Weight</th><th>Dimensions</th><th class="text-end">Declared</th>
+            <th>#</th><th>Packaging</th><th>Qty</th><th>Class</th><th>NMFC</th><th>Commodity</th><th>Weight</th><th>Dimensions</th><th class="text-end">Declared</th>
           </tr></thead>
           <tbody>${pkgRows}</tbody>
         </table>
@@ -218,7 +256,17 @@
         { data: 'status', render: (d)=> statusBadge(d) },
         { data: null, render: (row)=> `${row.totals.items||0} (${row.totals.qty||0})` },
         { data: 'totals.grand_total', className:'text-end', render: (d)=> currency(d) },
-        { data: 'created_at', className:'text-nowrap' },
+        { 
+          data: 'created_at', 
+          className:'text-nowrap editable-date',
+          render: function(d, type, row) {
+            if (type === 'display') {
+              const dateStr = d || '—';
+              return `<span class="editable-date-value" data-id="${row.id}" data-date="${d}">${dateStr}</span> <i class="fa fa-edit text-muted small" style="cursor:pointer;margin-left:5px;" title="Click to edit"></i>`;
+            }
+            return d;
+          }
+        },
         {
           data: null,
           orderable: false,
@@ -304,6 +352,115 @@
         row.child(formatDetails(row.data())).show();
         tr.find('.dt-control i').removeClass('fa-chevron-right').addClass('fa-chevron-down');
       }
+    });
+
+    // Inline date editing
+    $(document).on('click', '.editable-date-value, .editable-date .fa-edit', function(e){
+      e.stopPropagation();
+      const $span = $(this).closest('.editable-date').find('.editable-date-value');
+      const shipmentId = $span.data('id');
+      const currentDate = $span.data('date') || '';
+      
+      // Convert Y-m-d H:i to datetime-local format
+      let dateValue = '';
+      if (currentDate) {
+        const date = new Date(currentDate.replace(' ', 'T'));
+        if (!isNaN(date.getTime())) {
+          dateValue = date.toISOString().slice(0, 16);
+        }
+      }
+      
+      const $input = $('<input>', {
+        type: 'datetime-local',
+        class: 'form-control form-control-sm',
+        value: dateValue,
+        style: 'width:180px;display:inline-block;'
+      });
+      
+      const $saveBtn = $('<button>', {
+        type: 'button',
+        class: 'btn btn-sm btn-success ms-1',
+        html: '<i class="fa fa-check"></i>',
+        title: 'Save'
+      });
+      
+      const $cancelBtn = $('<button>', {
+        type: 'button',
+        class: 'btn btn-sm btn-secondary ms-1',
+        html: '<i class="fa fa-times"></i>',
+        title: 'Cancel'
+      });
+      
+      $span.replaceWith($input);
+      $input.after($saveBtn).after($cancelBtn);
+      $input.focus();
+      
+      const saveDate = function(){
+        const newDate = $input.val();
+        if (!newDate) {
+          Swal.fire({ icon: 'error', title: 'Date is required', timer: 2000 });
+          return;
+        }
+        
+        $.ajax({
+          url: `{{ url('/shipment') }}/${shipmentId}/update-date`,
+          method: 'POST',
+          data: {
+            _token: '{{ csrf_token() }}',
+            created_at: newDate
+          },
+          success: function(response){
+            const formattedDate = response.created_at || newDate;
+            
+            const $newSpan = $('<span>', {
+              class: 'editable-date-value',
+              'data-id': shipmentId,
+              'data-date': formattedDate,
+              text: formattedDate
+            });
+            const $icon = $('<i>', {
+              class: 'fa fa-edit text-muted small',
+              style: 'cursor:pointer;margin-left:5px;',
+              title: 'Click to edit'
+            });
+            
+            $input.remove();
+            $saveBtn.remove();
+            $cancelBtn.remove();
+            $input.closest('td').html($newSpan).append(' ').append($icon);
+            
+            table.ajax.reload(null, false);
+            Swal.fire({ icon: 'success', title: 'Date updated', timer: 1500 });
+          },
+          error: function(xhr){
+            Swal.fire({ icon: 'error', title: 'Failed to update date', text: xhr.responseJSON?.message || 'Error' });
+          }
+        });
+      };
+      
+      $saveBtn.on('click', saveDate);
+      $cancelBtn.on('click', function(){
+        const $newSpan = $('<span>', {
+          class: 'editable-date-value',
+          'data-id': shipmentId,
+          'data-date': currentDate,
+          text: currentDate || '—'
+        });
+        const $icon = $('<i>', {
+          class: 'fa fa-edit text-muted small',
+          style: 'cursor:pointer;margin-left:5px;',
+          title: 'Click to edit'
+        });
+        $input.remove();
+        $saveBtn.remove();
+        $cancelBtn.remove();
+        $input.closest('td').html($newSpan).append(' ').append($icon);
+      });
+      
+      $input.on('keypress', function(e){
+        if (e.which === 13) saveDate();
+        if (e.which === 27) $cancelBtn.click();
+      });
     });
 
     // SweetAlert delete confirmation

@@ -38,3 +38,4 @@ class UpdateAppointmentsAddCustomerId extends Migration
     }
 }
 
+

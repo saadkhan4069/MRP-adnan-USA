@@ -194,6 +194,110 @@
 						        </tr>
 
 						        <tr>
+						            <td>{{__('Shipping / Logistic')}}</td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("shipments-index", $all_permission))
+								                <input type="checkbox" value="1" id="shipments-index" name="shipments-index" checked>
+								                @else
+								                <input type="checkbox" value="1" id="shipments-index" name="shipments-index">
+								                @endif
+								                <label for="shipments-index"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("shipments-add", $all_permission))
+								                <input type="checkbox" value="1" id="shipments-add" name="shipments-add" checked>
+								                @else
+								                <input type="checkbox" value="1" id="shipments-add" name="shipments-add">
+								                @endif
+								                <label for="shipments-add"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("shipments-edit", $all_permission))
+								                <input type="checkbox" value="1" id="shipments-edit" name="shipments-edit" checked />
+								                @else
+								                <input type="checkbox" value="1" id="shipments-edit" name="shipments-edit">
+								                @endif
+								                <label for="shipments-edit"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("shipments-delete", $all_permission))
+								                <input type="checkbox" value="1" id="shipments-delete" name="shipments-delete" checked>
+								                @else
+								                <input type="checkbox" value="1" id="shipments-delete" name="shipments-delete">
+								                @endif
+								                <label for="shipments-delete"></label>
+							            	</div>
+						            	</div>
+						            </td>
+						        </tr>
+
+						        <tr>
+						            <td>{{__('WooCommerce Orders')}}</td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("woocommerce-index", $all_permission))
+								                <input type="checkbox" value="1" id="woocommerce-index" name="woocommerce-index" checked>
+								                @else
+								                <input type="checkbox" value="1" id="woocommerce-index" name="woocommerce-index">
+								                @endif
+								                <label for="woocommerce-index"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("woocommerce-add", $all_permission))
+								                <input type="checkbox" value="1" id="woocommerce-add" name="woocommerce-add" checked>
+								                @else
+								                <input type="checkbox" value="1" id="woocommerce-add" name="woocommerce-add">
+								                @endif
+								                <label for="woocommerce-add"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("woocommerce-edit", $all_permission))
+								                <input type="checkbox" value="1" id="woocommerce-edit" name="woocommerce-edit" checked />
+								                @else
+								                <input type="checkbox" value="1" id="woocommerce-edit" name="woocommerce-edit">
+								                @endif
+								                <label for="woocommerce-edit"></label>
+							                </div>
+							            </div>
+						            </td>
+						            <td class="text-center">
+						                <div class="icheckbox_square-blue" aria-checked="false" aria-disabled="false">
+							                <div class="checkbox">
+								                @if(in_array("woocommerce-delete", $all_permission))
+								                <input type="checkbox" value="1" id="woocommerce-delete" name="woocommerce-delete" checked>
+								                @else
+								                <input type="checkbox" value="1" id="woocommerce-delete" name="woocommerce-delete">
+								                @endif
+								                <label for="woocommerce-delete"></label>
+							            	</div>
+						            	</div>
+						            </td>
+						        </tr>
+
+						        <tr>
 						            <td>{{__('db.Sale')}}</td>
 						            <td class="text-center">
 						                <div class="icheckbox_square-blue checked" aria-checked="false" aria-disabled="false">
@@ -1743,6 +1847,78 @@
 							                    	<input type="checkbox" value="1" id="today_profit" name="today_profit">
 							                    	@endif
 								                    <label for="today_profit" class="padding05">{{__('db.Today Profit')}} &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						            	</span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("purchase-shipment-list", $all_permission))
+							                    	<input type="checkbox" value="1" id="purchase-shipment-list" name="purchase-shipment-list" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="purchase-shipment-list" name="purchase-shipment-list">
+							                    	@endif
+								                    <label for="purchase-shipment-list" class="padding05">Purchase Shipment List &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						                </span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("woocommerce-api-settings", $all_permission))
+							                    	<input type="checkbox" value="1" id="woocommerce-api-settings" name="woocommerce-api-settings" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="woocommerce-api-settings" name="woocommerce-api-settings">
+							                    	@endif
+								                    <label for="woocommerce-api-settings" class="padding05">WooCommerce API Settings &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						                </span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("courier", $all_permission))
+							                    	<input type="checkbox" value="1" id="courier" name="courier" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="courier" name="courier">
+							                    	@endif
+								                    <label for="courier" class="padding05">Courier &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						                </span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("challan-report", $all_permission))
+							                    	<input type="checkbox" value="1" id="challan-report" name="challan-report" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="challan-report" name="challan-report">
+							                    	@endif
+								                    <label for="challan-report" class="padding05">Challan Report &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						                </span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("inventory-movement", $all_permission))
+							                    	<input type="checkbox" value="1" id="inventory-movement" name="inventory-movement" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="inventory-movement" name="inventory-movement">
+							                    	@endif
+								                    <label for="inventory-movement" class="padding05">Inventory Movement &nbsp;&nbsp;</label>
+								                </div>
+								            </div>
+						                </span>
+						            	<span>
+						                    <div aria-checked="false" aria-disabled="false">
+								                <div class="checkbox">
+							                    	@if(in_array("appointments", $all_permission))
+							                    	<input type="checkbox" value="1" id="appointments" name="appointments" checked>
+							                    	@else
+							                    	<input type="checkbox" value="1" id="appointments" name="appointments">
+							                    	@endif
+								                    <label for="appointments" class="padding05">Appointments &nbsp;&nbsp;</label>
 								                </div>
 								            </div>
 						                </span>

@@ -802,6 +802,81 @@ class TenantDatabaseSeeder extends Seeder
                     'id' => 139,
                     'name' => 'invoice_create_edit_delete',
                     'guard_name' => 'web',
+                ],
+                [
+                    'id' => 140,
+                    'name' => 'shipments-index',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 141,
+                    'name' => 'shipments-add',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 142,
+                    'name' => 'shipments-edit',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 143,
+                    'name' => 'shipments-delete',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 144,
+                    'name' => 'shipments-view',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 145,
+                    'name' => 'purchase-shipment-list',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 146,
+                    'name' => 'inventory-movement',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 147,
+                    'name' => 'appointments',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 148,
+                    'name' => 'challan-report',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 149,
+                    'name' => 'purchases-import',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 150,
+                    'name' => 'woocommerce-index',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 151,
+                    'name' => 'woocommerce-add',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 152,
+                    'name' => 'woocommerce-edit',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 153,
+                    'name' => 'woocommerce-delete',
+                    'guard_name' => 'web',
+                ],
+                [
+                    'id' => 154,
+                    'name' => 'woocommerce-api-settings',
+                    'guard_name' => 'web',
                 ]
         ];
 
@@ -1137,6 +1212,66 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'permission_id' => 139,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 140,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 141,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 142,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 143,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 144,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 145,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 146,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 147,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 148,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 149,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 150,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 151,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 152,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 153,
+                    'role_id' => 1,
+                ],
+                [
+                    'permission_id' => 154,
                     'role_id' => 1,
                 ]
             ];

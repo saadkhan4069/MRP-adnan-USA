@@ -41,6 +41,9 @@
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Shipment #{{ $shipment->id }}</h5>
           <div>
+            <button id="openCreateLabelBtn" type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#createLabelModal">
+              <i class="fa fa-tag"></i> Create Shipping Label
+            </button>
             <a href="{{ route('shipment.edit', $shipment->id) }}" class="btn btn-warning btn-sm">
               <i class="fa fa-edit"></i> Edit
             </a>
@@ -159,6 +162,21 @@
                     <i class="fa fa-phone"></i> {{ $shipment->ship_from_contact }}<br>
                     <i class="fa fa-envelope"></i> {{ $shipment->ship_from_email }}
                   </div>
+                  @if($shipment->ship_from_dock_hours)
+                    <div class="mt-2"><strong>Dock Hours:</strong> {{ $shipment->ship_from_dock_hours }}</div>
+                  @endif
+                  @if($shipment->ship_from_lunch_hour)
+                    <div class="mt-1"><strong>Lunch Hour:</strong> {{ $shipment->ship_from_lunch_hour }}</div>
+                  @endif
+                  @if($shipment->ship_from_pickup_delivery_instructions)
+                    <div class="mt-1"><strong>Pick up / Delivery Instructions:</strong><br>{{ $shipment->ship_from_pickup_delivery_instructions }}</div>
+                  @endif
+                  @if($shipment->ship_from_appointment)
+                    <div class="mt-1"><strong>Appointment:</strong> {{ $shipment->ship_from_appointment }}</div>
+                  @endif
+                  @if($shipment->ship_from_accessorial)
+                    <div class="mt-1"><strong>Accessorial:</strong><br>{{ $shipment->ship_from_accessorial }}</div>
+                  @endif
                 </div>
               </div>
             </div>
@@ -180,6 +198,21 @@
                     <i class="fa fa-phone"></i> {{ $shipment->ship_to_contact }}<br>
                     <i class="fa fa-envelope"></i> {{ $shipment->ship_to_email }}
                   </div>
+                  @if($shipment->ship_to_dock_hours)
+                    <div class="mt-2"><strong>Dock Hours:</strong> {{ $shipment->ship_to_dock_hours }}</div>
+                  @endif
+                  @if($shipment->ship_to_lunch_hour)
+                    <div class="mt-1"><strong>Lunch Hour:</strong> {{ $shipment->ship_to_lunch_hour }}</div>
+                  @endif
+                  @if($shipment->ship_to_pickup_delivery_instructions)
+                    <div class="mt-1"><strong>Pick up / Delivery Instructions:</strong><br>{{ $shipment->ship_to_pickup_delivery_instructions }}</div>
+                  @endif
+                  @if($shipment->ship_to_appointment)
+                    <div class="mt-1"><strong>Appointment:</strong> {{ $shipment->ship_to_appointment }}</div>
+                  @endif
+                  @if($shipment->ship_to_accessorial)
+                    <div class="mt-1"><strong>Accessorial:</strong><br>{{ $shipment->ship_to_accessorial }}</div>
+                  @endif
                 </div>
               </div>
             </div>
@@ -351,5 +384,140 @@
     </div>
   </div>
 </div>
+
+{{-- ===================== MODAL (Create/Update Label) ===================== --}}
+<div class="modal fade" id="createLabelModal" tabindex="-1" role="dialog" aria-labelledby="createLabelLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <form class="modal-content" method="POST" action="{{ route('shipment.label.store', $shipment->id) }}">
+      @csrf
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="createLabelLabel"><i class="fa fa-tag"></i> Create Shipping Label</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Carrier *</label>
+            <select name="provider" id="provider" class="form-control" required>
+              <option value="" disabled {{ $shipment->provider ? '' : 'selected' }}>Select</option>
+              <option value="dhl"   {{ $shipment->provider==='dhl'   ? 'selected' : '' }}>DHL</option>
+              <option value="ups"   {{ $shipment->provider==='ups'   ? 'selected' : '' }}>UPS</option>
+              <option value="fedex" {{ $shipment->provider==='fedex' ? 'selected' : '' }}>FedEx</option>
+              <option value="other" {{ $shipment->provider==='other' ? 'selected' : '' }}>Other</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Service (Code)</label>
+            <input type="text" name="service_code" value="{{ $shipment->service_code ?? '' }}" class="form-control" placeholder="e.g. EXPRESS_WORLDWIDE / 2ND_DAY">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Service Name</label>
+            <input type="text" name="service_name" value="{{ $shipment->service_name ?? '' }}" class="form-control" placeholder="e.g. Express Worldwide">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Payer</label>
+            <select name="payer" class="form-control">
+              <option value="" {{ empty($shipment->payer) ? 'selected' : '' }}>Select</option>
+              <option value="shipper"     {{ $shipment->payer==='shipper'     ? 'selected' : '' }}>Shipper</option>
+              <option value="receiver"    {{ $shipment->payer==='receiver'    ? 'selected' : '' }}>Receiver</option>
+              <option value="third_party" {{ $shipment->payer==='third_party' ? 'selected' : '' }}>Third Party</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Account #</label>
+            <input type="text" name="account_number" value="{{ $shipment->account_number ?? '' }}" class="form-control" placeholder="Carrier Account">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Signature Option</label>
+            <select name="signature_option" class="form-control">
+              <option value=""       {{ empty($shipment->signature_option) ? 'selected' : '' }}>None</option>
+              <option value="direct" {{ $shipment->signature_option==='direct' ? 'selected' : '' }}>Direct</option>
+              <option value="adult"  {{ $shipment->signature_option==='adult'  ? 'selected' : '' }}>Adult</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Saturday Delivery?</label>
+            <select name="saturday_delivery" class="form-control">
+              <option value="0" {{ empty($shipment->saturday_delivery) ? 'selected' : '' }}>No</option>
+              <option value="1" {{ !empty($shipment->saturday_delivery) ? 'selected' : '' }}>Yes</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Declared Value (Total)</label>
+            <input type="number" step="0.01" name="declared_value_total" value="{{ $shipment->declared_value_total ?? '' }}" class="form-control" placeholder="0.00">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Currency</label>
+            <input type="text" name="currency" value="{{ $shipment->currency->code ?? '' }}" class="form-control" placeholder="e.g. USD / PKR">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Reference (on label)</label>
+            <input type="text" name="reference" value="{{ $shipment->reference_no ?? '' }}" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Tracking # (optional)</label>
+            <input type="text" name="tracking_number" value="{{ $shipment->tracking_number ?? '' }}" class="form-control" placeholder="If already assigned">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" rows="2" class="form-control" placeholder="Any special instruction for label">{{ $shipment->comments ?? '' }}</textarea>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Estimated Rate (optional)</label>
+            <input type="number" step="0.01" name="rate_amount" value="{{ json_decode($shipment->rate_breakdown ?? '{}', true)['estimated_rate'] ?? '' }}" class="form-control" placeholder="e.g. 150.00">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Label Format</label>
+            <select name="label_format" class="form-control">
+              <option value=""    {{ empty($shipment->label_format) ? 'selected' : '' }}>Auto</option>
+              <option value="PDF" {{ $shipment->label_format==='PDF' ? 'selected' : '' }}>PDF</option>
+              <option value="ZPL" {{ $shipment->label_format==='ZPL' ? 'selected' : '' }}>ZPL</option>
+              <option value="PNG" {{ $shipment->label_format==='PNG' ? 'selected' : '' }}>PNG</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="small text-muted mt-2">
+          This will save label fields on the shipment (tracking, label URL, etc.). You can hook your carrier API later.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-success">
+          <i class="fa fa-save"></i> Save Label
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{-- Optional tiny fallback so it also works if the project is on Bootstrap 5 --}}
+<script>
+  (function(){
+    var btn = document.getElementById('openCreateLabelBtn');
+    if (btn && !btn.getAttribute('data-bs-toggle')) {
+      btn.setAttribute('data-bs-toggle','modal');
+      btn.setAttribute('data-bs-target','#createLabelModal');
+    }
+  })();
+</script>
 
 @endsection 

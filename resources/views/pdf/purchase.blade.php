@@ -252,7 +252,6 @@
         <td>{{ $currency }} {{ number_format($subTotalRows, 2) }}</td>
     </tr>
 
-    {{-- OPTIONAL: Agar Order Tax totals mein chahiye to is row ko rakhein, warna hata dein --}}
     <tr>
         <th>Order Tax</th>
         <td>{{ $currency }} {{ number_format($order_tax, 2) }}</td>
@@ -272,14 +271,14 @@
         <th>Grand Total</th>
         <td>{{ $currency }} {{ number_format($grandTotal, 2) }}</td>
     </tr>
-    <tr>
+    <!-- <tr>
         <th>Paid</th>
         <td>{{ $currency }} {{ number_format($paid_amount, 2) }}</td>
     </tr>
     <tr>
         <th>Due</th>
         <td>{{ $currency }} {{ number_format($dueAmount, 2) }}</td>
-    </tr>
+    </tr> -->
 </table>
 
    

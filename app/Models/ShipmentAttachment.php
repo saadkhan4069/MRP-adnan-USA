@@ -14,11 +14,15 @@ class ShipmentAttachment extends Model
 
     protected $fillable = [
         'shipment_id',
+        'title',
         'original_name',
         'filename',
         'path',
+        'disk',
+        'type',
         'mime',
         'size',
+        'uploaded_by',
     ];
 
     public function shipment()

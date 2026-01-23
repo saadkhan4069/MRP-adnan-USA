@@ -103,13 +103,14 @@
     <div class="col-md-4">
     <div class="form-group">
     <label>Customer</label>
-    <input type="hidden" name="customer_id_hidden" value="{{ $lims_purchase_data->user_id }}" />
-   <select name="customer_id" name="customer_id" class="selectpicker form-control" data-live-search="true" title="Select Customer...">
+    <input type="hidden" name="customer_id_hidden" value="{{ $lims_purchase_data->customer_id ?? $lims_purchase_data->user_id }}" />
+   <select name="customer_id" id="customer_id" class="selectpicker form-control" data-live-search="true" title="Select Customer...">
 
 @foreach($lims_customer_list as $customer)
 
 <option value="{{$customer->id}}"
-     @if(isset($lims_purchase_data->user_id) && $lims_purchase_data->user_id == $customer->id) selected @endif>
+     @if(isset($lims_purchase_data->customer_id) && $lims_purchase_data->customer_id == $customer->id) selected 
+     @elseif(!isset($lims_purchase_data->customer_id) && isset($lims_purchase_data->user_id) && $lims_purchase_data->user_id == $customer->id) selected @endif>
      {{$customer->name .' ('. $customer->company_name .')'}}</option>
 @endforeach
 </select>
@@ -853,7 +854,12 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
   $('[data-toggle="tooltip"]').tooltip();
 
   // Assign initial selects
-  $('select[name="supplier_id"]').val($('input[name="customer_id_hidden"]').val());
+  // Fix: Set customer_id properly
+  var customerId = $('input[name="customer_id_hidden"]').val();
+  if(customerId) {
+    $('select[name="customer_id"]').val(customerId);
+  }
+  $('select[name="supplier_id"]').val($('input[name="supplier_id_hidden"]').val());
   $('select[name="warehouse_id"]').val($('input[name="warehouse_id_hidden"]').val());
   $('select[name="status"]').val($('input[name="status_hidden"]').val());
   $('select[name="order_tax_rate"]').val($('input[name="order_tax_rate_hidden"]').val());

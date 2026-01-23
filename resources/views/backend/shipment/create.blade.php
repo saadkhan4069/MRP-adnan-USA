@@ -8,6 +8,15 @@
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
+@if($errors->any())
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 <x-validation-error fieldName="product_code" />
 <x-validation-error fieldName="qty" />
 
@@ -131,8 +140,8 @@
       <div class="col-12">
 
         <div class="wizard-steps" id="wizard-steps">
-          <div class="wizard-step active" data-step="1">1) Shipper</div>
-          <div class="wizard-step" data-step="2">2) Recipient</div>
+          <div class="wizard-step active" data-step="1">1) Shipper info</div>
+          <div class="wizard-step" data-step="2">2) Consignee info</div>
           <div class="wizard-step" data-step="3">3) Packages</div>
           <div class="wizard-step" data-step="4">4) Items (optional)</div>
           <div class="wizard-step" data-step="5">5) Charges</div>
@@ -180,9 +189,11 @@
                       <select name="status" class="form-control">
                         <option value="1">Pending</option>
                         <option value="2">In Transit</option>
-                        <option value="3">Delivered</option>
+                      <option value="3">Delivered</option>
                         <option value="4">Returned</option>
                         <option value="5">Cancelled</option>
+                        <option value="6">Shipped</option>
+                        <option value="7">partial Shipped</option>
                       </select>
                     </div>
 
@@ -224,6 +235,26 @@
                     <div class="col-md-3 mb-3">
                       <label>Email *</label>
                       <input type="email" name="ship_from_email" class="form-control required-field" placeholder="name@company.com" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Dock Hours</label>
+                      <input type="text" name="ship_from_dock_hours" class="form-control" placeholder="">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Lunch Hour</label>
+                      <input type="text" name="ship_from_lunch_hour" class="form-control" placeholder="e.g. 12:00 PM - 1:00 PM">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label>Pick up / Delivery Instructions</label>
+                      <textarea name="ship_from_pickup_delivery_instructions" class="form-control" rows="2" placeholder="Special instructions for pickup"></textarea>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Appointment</label>
+                      <input type="text" name="ship_from_appointment" class="form-control" placeholder="e.g. Appointment required">
+                    </div>
+                    <div class="col-md-9 mb-3">
+                      <label>Accessorial</label>
+                      <textarea name="ship_from_accessorial" class="form-control" rows="2" placeholder="Additional services or requirements"></textarea>
                     </div>
                   </div>
                 </div>
@@ -270,6 +301,26 @@
                     <div class="col-md-3 mb-3">
                       <label>Email *</label>
                       <input type="email" name="ship_to_email" class="form-control required-field" placeholder="name@company.com" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Dock Hours</label>
+                      <input type="text" name="ship_to_dock_hours" class="form-control" placeholder="">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Lunch Hour</label>
+                      <input type="text" name="ship_to_lunch_hour" class="form-control" placeholder="e.g. 12:00 PM - 1:00 PM">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label>Pick up / Delivery Instructions</label>
+                      <textarea name="ship_to_pickup_delivery_instructions" class="form-control" rows="2" placeholder="Special instructions for delivery"></textarea>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label>Appointment</label>
+                      <input type="text" name="ship_to_appointment" class="form-control" placeholder="e.g. Appointment required">
+                    </div>
+                    <div class="col-md-9 mb-3">
+                      <label>Accessorial</label>
+                      <textarea name="ship_to_accessorial" class="form-control" rows="2" placeholder="Additional services or requirements"></textarea>
                     </div>
 
                     <div class="col-md-2 mb-3">
@@ -363,7 +414,7 @@
                     </div>
                     <div class="col-md-4 mb-3">
                       <label><strong>Shipping Cost</strong></label>
-                      <input type="number" step="0.1" name="shipping_cost" id="shipping_cost_input" class="form-control" placeholder="0.00" value="0">
+                      <input type="number" step="0.01" name="shipping_cost" id="shipping_cost_input" class="form-control" placeholder="0.00" value="0">
                     </div>
 
                     <div class="col-md-12 mb-3">
@@ -705,9 +756,33 @@ function validateStep(step){
   return ok;
 }
 $('#shipment-form').on('submit',function(e){
-  if(!validateStep(currentStep)){ e.preventDefault(); return; }
-  recalcTotals(); updateSummary();
-  $('#submit-btn').prop('disabled',true);
+  // Validate all required steps before submit
+  let allValid = true;
+  for(let step = 1; step <= 5; step++) {
+    if(!validateStep(step)) {
+      allValid = false;
+      showStep(step); // Go to first invalid step
+      break;
+    }
+  }
+  
+  if(!allValid){ 
+    e.preventDefault(); 
+    toast('Please fill all required fields before submitting.', 'warning');
+    return; 
+  }
+  
+  // Validate at least one package exists
+  if($('.package').length === 0) {
+    e.preventDefault();
+    toast('Please add at least one package.', 'warning');
+    showStep(3); // Go to packages step
+    return;
+  }
+  
+  recalcTotals(); 
+  updateSummary();
+  $('#submit-btn').prop('disabled',true).text('Submitting...');
 });
 
 /* ---------------- Summary ---------------- */
@@ -860,7 +935,30 @@ function packageCard(i){
             <option value="box">Box</option>
             <option value="envelope">Envelope</option>
             <option value="tube">Tube</option>
+            <option value="pallet">Pallet</option>
+            <option value="other">Other</option>
+            
           </select>
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Qty</label>
+          <input type="number" step="1" min="1" name="packages[${i}][qty]" class="form-control" placeholder="1" value="1">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Package Class</label>
+          <input type="text" name="packages[${i}][package_class]" class="form-control" placeholder="e.g. 70">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Package NMFC</label>
+          <input type="text" name="packages[${i}][package_nmfc]" class="form-control" placeholder="e.g. 123456">
+        </div>
+
+        <div class="pkg-field">
+          <label class="form-label">Commodity Name</label>
+          <input type="text" name="packages[${i}][commodity_name]" class="form-control" placeholder="e.g. Electronics, Clothing">
         </div>
 
         <div class="pkg-field">
@@ -938,6 +1036,9 @@ $('#packages').on('click', '.btn-duplicate', function(){
 function collectPkgValues($c){
   return {
     'select[name$="[packaging]"]': $c.find('select[name$="[packaging]"]').val(),
+    'input[name$="[package_class]"]': $c.find('input[name$="[package_class]"]').val(),
+    'input[name$="[package_nmfc]"]': $c.find('input[name$="[package_nmfc]"]').val(),
+    'input[name$="[commodity_name]"]': $c.find('input[name$="[commodity_name]"]').val(),
     'input[name$="[declared_value]"]': $c.find('input[name$="[declared_value]"]').val(),
     'input[name$="[weight]"]': $c.find('input[name$="[weight]"]').val(),
     'select[name$="[weight_unit]"]': $c.find('select[name$="[weight_unit]"]').val(),
@@ -1047,12 +1148,25 @@ function validateFile(file){
   return {ok:true};
 }
 function toast(msg, type='danger'){
-  // tiny inline toast using alert; replace with your toaster if present
-  const el = document.createElement('div');
-  el.className = `alert alert-${type} mt-2`;
-  el.textContent = msg;
-  dropZone.insertAdjacentElement('afterend', el);
-  setTimeout(()=>el.remove(), 3000);
+  // Use SweetAlert2 if available, otherwise fallback to alert
+  if(typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: type === 'danger' ? 'error' : (type === 'warning' ? 'warning' : 'info'),
+      title: msg,
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 3000
+    });
+  } else {
+    // Fallback: tiny inline toast
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} mt-2`;
+    el.textContent = msg;
+    const container = document.querySelector('.card-body') || document.body;
+    container.insertAdjacentElement('afterbegin', el);
+    setTimeout(()=>el.remove(), 3000);
+  }
 }
 function renderList(){
   fileListWrap.innerHTML = '';

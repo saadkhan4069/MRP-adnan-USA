@@ -14,9 +14,10 @@ class Authenticate extends Middleware
      */
     protected function redirectTo($request)
     {
-        if(!config('database.connections.saleprosaas_landlord') && empty(env('DB_DATABASE'))) {
-            return route('install-step-1');
-        }
+        // Install check disabled - app is already installed
+        // if(!config('database.connections.saleprosaas_landlord') && empty(env('DB_DATABASE'))) {
+        //     return route('install-step-1');
+        // }
         if (! $request->expectsJson()) {
             return route('login');
         }

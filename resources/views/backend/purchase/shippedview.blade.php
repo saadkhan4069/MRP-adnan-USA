@@ -106,6 +106,49 @@
     border-top: 1px solid #dee2e6;
 }
 
+/* Moving Truck Animation */
+.moving-truck {
+    display: inline-block;
+    animation: moveTruck 2s ease-in-out infinite;
+    transform-origin: center;
+}
+
+@keyframes moveTruck {
+    0% {
+        transform: translateX(0) rotate(0deg);
+    }
+    25% {
+        transform: translateX(10px) rotate(-5deg);
+    }
+    50% {
+        transform: translateX(20px) rotate(0deg);
+    }
+    75% {
+        transform: translateX(10px) rotate(5deg);
+    }
+    100% {
+        transform: translateX(0) rotate(0deg);
+    }
+}
+
+/* Alternative: Continuous moving animation */
+.moving-truck-continuous {
+    display: inline-block;
+    animation: moveTruckContinuous 1.5s linear infinite;
+}
+
+@keyframes moveTruckContinuous {
+    0% {
+        transform: translateX(-10px);
+    }
+    50% {
+        transform: translateX(10px);
+    }
+    100% {
+        transform: translateX(-10px);
+    }
+}
+
 /* Responsive tweaks (optional) */
 @media (max-width: 768px) {
     #shipment-details img {
@@ -212,6 +255,7 @@
                 <th>Status</th>
                 <th>Courier Name</th>
                 <th>Tracking No</th>
+                <th>Notes</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -226,7 +270,7 @@
 
       <div class="modal-header bg-dark text-white">
         <h5 class="modal-title" id="shipmentModalLabel">
-          <i class="fa fa-truck"></i> Shipment Details
+          <i class="fa fa-truck moving-truck"></i> Shipment Details
         </h5>
         <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
@@ -288,6 +332,11 @@
                 <label>Tracking Number</label>
                 <input type="text" class="form-control" name="tracking_number" id="tracking_number">
             </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea rows="3" class="form-control" name="notes" id="notes"></textarea>
+            </div>
+
         </div>
 
         <div class="modal-footer">
@@ -403,13 +452,38 @@ $(document).ready(function () {
             { className: 'dt-control', orderable: false, data: null, defaultContent: '' },
             { data: 'po_no' },
             { data: 'reference_no' },
-            { data: 'supplier_name' },
-            { data: 'customer_name' },
+            { 
+                data: 'supplier_name',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        var company = row.supplier_company || '';
+                        if (company) {
+                            return data + '<br><small class="text-muted">' + company + '</small>';
+                        }
+                        return data;
+                    }
+                    return data;
+                }
+            },
+            { 
+                data: 'customer_name',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        var company = row.customer_company || '';
+                        if (company) {
+                            return data + '<br><small class="text-muted">' + company + '</small>';
+                        }
+                        return data || '—';
+                    }
+                    return data || '—';
+                }
+            },
             { data: 'date' },
             { data: 'ship_cost' },
             { data: 'shipment_status' },
             { data: 'courier' },
             { data: 'tracking_number' },
+            { data: 'notes' },
             { data: 'options', orderable: false, searchable: false, className: 'no-click' }
         ],
 
@@ -524,6 +598,7 @@ $(document).on('click', '.edit-shipment', function () {
     $('#shipment_status').val($(this).data('status')).selectpicker('refresh');
     $('#carrier_id').val($(this).data('courier')).selectpicker('refresh');
     $('#tracking_number').val($(this).data('tracking'));
+    $('#notes').val($(this).data('notes'));
     $('#shipmentEditModal').modal('show');
 });
 

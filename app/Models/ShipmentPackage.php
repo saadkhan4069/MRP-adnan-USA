@@ -12,10 +12,16 @@ class ShipmentPackage extends Model
     protected $fillable = [
         'shipment_id',
         'packaging',
+        'qty',
+        'package_class',
+        'package_nmfc',
+        'commodity_name',
         'weight',
+        'weight_unit',
         'length',
         'width',
         'height',
+        'dim_unit',
         'declared_value',
         'dimensions_note',
     ];

@@ -255,7 +255,8 @@
         <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-6 d-print-none">
-                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="purchase-excel-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-document-new"></i> Excel</button>
                 </div>
                 <div class="col-md-6 d-print-none">
                     <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
@@ -578,13 +579,21 @@ var payment_status  = <?php echo json_encode($payment_status); ?>;
    Purchase Amount Calculator (uses HALF-UP rounding)
 ========================================================= */
 function computeRowAmounts(purchaseArr){
-  const baseTotal     = toNum(purchaseArr?.[13]); // items total
-  const orderTaxAmt   = toNum(purchaseArr?.[16]);
-  const orderDiscAmt  = toNum(purchaseArr?.[18]);
-  const shippingAmt   = toNum(purchaseArr?.[19]);
-  const grandServer   = toNum(purchaseArr?.[20]);
+  // Clean values by removing quotes and converting to numbers
+  const cleanValue = (val) => {
+    if (val === null || val === undefined) return 0;
+    const cleaned = String(val).replace(/["']/g, '').replace(/,/g, '').trim();
+    const num = parseFloat(cleaned);
+    return Number.isFinite(num) ? num : 0;
+  };
 
-  const grandCalc = roundN(baseTotal - orderDiscAmt + orderTaxAmt + shippingAmt);
+  const baseTotal     = cleanValue(purchaseArr?.[13]); // items total
+  const orderTaxAmt   = cleanValue(purchaseArr?.[16]);
+  const orderDiscAmt  = cleanValue(purchaseArr?.[18]);
+  const shippingAmt   = cleanValue(purchaseArr?.[19]);
+  const grandServer   = cleanValue(purchaseArr?.[20]);
+
+  const grandCalc = baseTotal - orderDiscAmt + orderTaxAmt + shippingAmt;
   const grand     = grandServer > 0 ? grandServer : grandCalc;
 
   return { baseTotal, orderTaxAmt, orderDiscAmt, shippingAmt, grand };
@@ -674,6 +683,8 @@ function datatable_sum_calc(api, is_export){
     const row = api.row(idx).data();
     const pArr = row?.purchase || $(api.row(idx).node()).data('purchase') || [];
     const c = computeRowAmounts(pArr);
+  
+   console.log(c,"ccccccccccccccccccccccccc");
     totalGrand   += toNum(c.grand);
     totalReturned+= toNum(row.returned_amount);
     totalPaid    += toNum(row.paid_amount);
@@ -708,6 +719,246 @@ function exportCalcToXlsx(){
     const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Purchases'); XLSX.writeFile(wb,'purchases_calc.xlsx'); toastSuccess('Export (Calc) complete');
   };
   makeXlsx().catch(()=> toastError('Export failed. Please try again.'));
+}
+
+/* =========================================================
+   Purchase modal → Excel export (same layout as quotation)
+========================================================= */
+window.currentPurchaseRaw = null;
+
+function purchaseGetFileSafe(str){
+  return String(str || '')
+    .replace(/[\\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '_')
+    .slice(0, 120);
+}
+function purchaseFileBase(){
+  const p = window.currentPurchaseRaw || [];
+  const code = (p?.[33]) || (p?.[31]) || (p?.[1]) || 'purchase';
+  const date = p?.[0] || '';
+  return ['purchase', purchaseGetFileSafe(code), purchaseGetFileSafe(date)].filter(Boolean).join('_');
+}
+function purchaseDownload(content, mime, filename){
+  const blob = new Blob([content], { type: mime + ';charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+function purchaseBeautifyTable($tbl, options = {}){
+  $tbl.attr('style', 'table-layout:fixed;width:100%;border-collapse:collapse;font-size:11pt;');
+  $tbl.find('thead th').each(function(){
+    $(this).css({'background':'#ffffff','font-weight':'700','border':'1px solid #000'});
+  });
+  $tbl.find('tbody td, tbody th').each(function(){
+    $(this).css('border','1px solid #000');
+  });
+  if(options.forceMoneyCols){
+    options.forceMoneyCols.forEach(function(ci){
+      $tbl.find('tbody tr td:nth-child('+ci+')').attr('style', function(_, s){ return (s||'') + 'mso-number-format:"0.00";'; });
+    });
+  }
+  if(options.forceQtyCols){
+    options.forceQtyCols.forEach(function(ci){
+      $tbl.find('tbody tr td:nth-child('+ci+')').attr('style', function(_, s){ return (s||'') + 'mso-number-format:"0";'; });
+    });
+  }
+  if(options.removeLastCol){
+    $tbl.find('thead tr').each(function(){ $(this).find('th').last().remove(); });
+    $tbl.find('tbody tr').each(function(){ $(this).find('td').last().remove(); });
+  }
+  let html = $tbl.prop('outerHTML');
+  if(options.injectColgroup){
+    const cg = '<colgroup>' + options.injectColgroup.map(w => `<col style="width:${w}"/>`).join('') + '</colgroup>';
+    html = html.replace('<thead', cg + '<thead');
+  }
+  return html;
+}
+function cleanSupplierTable($tbl){
+  $tbl.find('button, .btn, .buttons-pdf').remove();
+  $tbl.find('td').each(function(){
+    if($.trim($(this).text()) === '') $(this).remove();
+  });
+  return $tbl;
+}
+function exportPurchaseExcel(){
+  if(!window.currentPurchaseRaw){
+    toastWarn('Pehlay purchase detail open karein.');
+    return;
+  }
+  const brandLogo = "{{ asset('images/logo.webp') }}";
+  const brandRed  = "#9a191c";
+  const linkBlue  = "#1155cc";
+
+  const suppliersHTML = cleanSupplierTable($('#purchase-content .product-purchase-list_design').first().clone());
+  const productsHTML  = $('#purchase-details table.product-purchase-list').clone();
+  const totalsHTML    = $('#purchase-details table.product-purchase-list2').clone();
+
+  if(!productsHTML.length || !totalsHTML.length){
+    toastWarn('Purchase detail tables tayyar nahi hain.');
+    return;
+  }
+
+  const purchase = window.currentPurchaseRaw;
+  const poOne = purchase?.[31] || '';
+  const poTwo = purchase?.[33] || '';
+  const date  = purchase?.[0] || '';
+  const ref   = purchase?.[1] || '';
+  const status = purchase?.[2] || '';
+  const currency = purchase?.[29] || '';
+
+  const customer = {
+    name: purchase?.[23] || '',
+    email: purchase?.[24] || '',
+    phone: purchase?.[25] || '',
+    company: purchase?.[26] || '',
+    address: purchase?.[27] || '',
+    website: purchase?.[36] || ''
+  };
+  const warehouse = {
+    name: purchase?.[4] || '',
+    company: purchase?.[32] || '',
+    phone: purchase?.[5] || '',
+    address: purchase?.[6] || '',
+    website: purchase?.[37] || ''
+  };
+
+  const shippingInstructions = purchase?.[38] || '';
+  const specialInstructions  = purchase?.[35] || '';
+  const signatureNote        = purchase?.[34] || '';
+
+  const topHeader = `
+    <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border:none; margin-bottom:4pt;">
+      <tr>
+        <td style="width:80px; border:none; vertical-align:top;">
+          <img src="${brandLogo}" style="height:60px; width:auto;" />
+        </td>
+        <td style="border:none; vertical-align:middle;">
+          <div style="font-family:Calibri,Arial;font-size:14pt;font-weight:700;letter-spacing:.5pt;">EZ - SOLUTIONS</div>
+          <div style="color:${brandRed};font-family:Calibri,Arial;font-size:12pt;">Retail-Ready Supply Chains Built for CPG Velocity</div>
+        </td>
+      </tr>
+    </table>`;
+
+  const poBlock = `
+    <table style="width:420pt; border-collapse:collapse; margin-top:6pt; margin-bottom:8pt; font-size:11pt;">
+      ${poOne ? `<tr><th align="left" style="padding:6pt;border:1px solid #000;">Quote #</th><td style="padding:6pt;border:1px solid #000;color:${brandRed};font-weight:700;">${poOne}</td></tr>` : ''}
+      ${poTwo ? `<tr><th align="left" style="padding:6pt;border:1px solid #000;">PO #</th><td style="padding:6pt;border:1px solid #000;color:${brandRed};font-weight:700;">${poTwo}</td></tr>` : ''}
+      <tr><th align="left" style="padding:6pt;border:1px solid #000;">Date</th><td style="padding:6pt;border:1px solid #000;">${date}</td></tr>
+      <tr><th align="left" style="padding:6pt;border:1px solid #000;">Reference</th><td style="padding:6pt;border:1px solid #000;">${ref}</td></tr>
+      <tr><th align="left" style="padding:6pt;border:1px solid #000;">Purchase Status</th><td style="padding:6pt;border:1px solid #000;">${status}</td></tr>
+      <tr><th align="left" style="padding:6pt;border:1px solid #000;">Currency</th><td style="padding:6pt;border:1px solid #000;">${currency}</td></tr>
+    </table>`;
+
+  function infoBlock(title, rows){
+    return `
+      <table style="width:100%;border-collapse:separate;border-spacing:0;margin:8pt 0 10pt 0;">
+        <tr>
+          <td style="border:1px solid #000;padding:4pt;">
+            <table style="width:100%;border-collapse:collapse;font-size:11pt;">
+              <tr><th colspan="2" style="border:1px solid #000;padding:6pt;text-align:center;">${title}</th></tr>
+              ${rows}
+            </table>
+          </td>
+        </tr>
+      </table>`;
+  }
+
+  const customerRows = `
+    <tr><td style="border:1px solid #000;padding:6pt;">Name</td><td style="border:1px solid #000;padding:6pt;color:${brandRed};">${customer.name}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Email</td><td style="border:1px solid #000;padding:6pt;"><a href="mailto:${customer.email}" style="color:${linkBlue};text-decoration:underline;">${customer.email}</a></td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Phone</td><td style="border:1px solid #000;padding:6pt;"><a href="tel:${customer.phone}" style="color:${linkBlue};text-decoration:underline;">${customer.phone}</a></td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Company</td><td style="border:1px solid #000;padding:6pt;">${customer.company}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Address</td><td style="border:1px solid #000;padding:6pt;">${customer.address}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Website</td><td style="border:1px solid #000;padding:6pt;"><a href="${customer.website}" style="color:${linkBlue};text-decoration:underline;">${customer.website}</a></td></tr>`;
+  const warehouseRows = `
+    <tr><td style="border:1px solid #000;padding:6pt;">Name</td><td style="border:1px solid #000;padding:6pt;">${warehouse.name}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Company</td><td style="border:1px solid #000;padding:6pt;color:${brandRed};">${warehouse.company}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Phone</td><td style="border:1px solid #000;padding:6pt;"><a href="tel:${warehouse.phone}" style="color:${linkBlue};text-decoration:underline;">${warehouse.phone}</a></td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Address</td><td style="border:1px solid #000;padding:6pt;">${warehouse.address}</td></tr>
+    <tr><td style="border:1px solid #000;padding:6pt;">Website</td><td style="border:1px solid #000;padding:6pt;"><a href="${warehouse.website}" style="color:${linkBlue};text-decoration:underline;">${warehouse.website}</a></td></tr>`;
+
+  const shippingBlock = shippingInstructions
+    ? `<div class="section-title">Shipping Instructions</div>
+       <table style="width:100%;border:1px solid #000;border-collapse:collapse;font-size:11pt;">
+         <tr><td style="padding:6pt;">${shippingInstructions}</td></tr>
+       </table>`
+    : '';
+
+  const specialBlock = specialInstructions
+    ? `<div class="section-title">Special Instructions</div>
+       <table style="width:100%;border:1px solid #000;border-collapse:collapse;font-size:11pt;">
+         <tr><td style="padding:6pt;">${specialInstructions}</td></tr>
+       </table>`
+    : '';
+
+  const signatureBlock = signatureNote
+    ? `<div style="margin-top:18pt;">
+         <div style="font-style:italic;font-size:11pt;">${signatureNote}</div>
+         <div style="display:inline-block;margin-top:12pt;text-align:center;border-top:1px solid ${brandRed};padding-top:6pt;width:180px;font-size:11pt;color:${brandRed};">
+           <strong>Authorized Signature</strong>
+         </div>
+       </div>`
+    : '';
+
+  const suppliersBlock = suppliersHTML.length
+    ? `<div class="section-title">Suppliers</div>${purchaseBeautifyTable(suppliersHTML, { removeLastCol:true })}`
+    : '';
+  const productsBlock = `<div class="section-title">Products</div>${purchaseBeautifyTable(productsHTML, {
+      injectColgroup:['4%','22%','15%','10%','10%','8%','7%','8%','8%','8%','8%','8%'],
+      forceQtyCols:[6,7],
+      forceMoneyCols:[9,10,11,12]
+    })}`;
+  const totalsBlock = `<div class="section-title">Totals</div>${purchaseBeautifyTable(totalsHTML, { forceMoneyCols:[1,2,3,4,5,6,7] })}`;
+
+  const footerBlock = `
+    <div class="no-border" style="text-align:center;margin-top:16pt;">
+      <div style="color:${brandRed};font-weight:700;">EZ SOLUTIONS ALL RIGHTS RESERVED @ ${(new Date()).getFullYear()}</div>
+      <div><a href="https://www.ez-solutions.co">www.ez-solutions.co</a></div>
+      <div><a href="mailto:info@ez-solutions.co">info@ez-solutions.co</a></div>
+    </div>`;
+
+  const meta = '<meta charset="utf-8" />';
+  const style = `
+    <style>
+      body, table { font-family:Calibri,Arial,sans-serif; font-size:11pt; }
+      td, th { padding:6pt; }
+      .section-title { font-weight:700; color:${brandRed}; font-size:12pt; margin:10pt 0 6pt 0; border:none !important; }
+      .bar { height:0; border-top:3px solid ${brandRed}; margin:8pt 0 12pt 0; }
+      a { color:${linkBlue}; text-decoration:underline; }
+    </style>`;
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+      <head>${meta}${style}</head>
+      <body>
+        ${topHeader}
+        <div class="bar"></div>
+        ${poBlock}
+        <table class="no-border" style="width:100%; border:none;">
+          <tr>
+            <td style="border:none; vertical-align:top;">${infoBlock('Customer Info', customerRows)}</td>
+            <td style="border:none; vertical-align:top;">${infoBlock('Warehouse / Production Info', warehouseRows)}</td>
+          </tr>
+        </table>
+        ${shippingBlock}
+        ${suppliersBlock}
+        <br/>
+        ${productsBlock}
+        <br/>
+        ${totalsBlock}
+        ${specialBlock}
+        ${signatureBlock}
+        ${footerBlock}
+      </body>
+    </html>`;
+
+  const fname = purchaseFileBase() + '.xls';
+  purchaseDownload(html, 'application/vnd.ms-excel', fname);
+  toastSuccess('Purchase Excel download started');
 }
 
 /* =========================================================
@@ -749,11 +1000,11 @@ let payment_date, payment_reference, paid_amount, paying_method, payment_id, pay
 $(document).on("click","table.purchase-list tbody .add-payment",function(){
   $("#cheque").hide(); $(".card-element").hide(); $('select[name="paid_by_id"]').val(1);
   var id=$(this).data('id').toString();
-  var balance=$(this).closest('tr').find('td:nth-child(9)').text();
+  var balance=$(this).closest('tr').find('td:nth-child(10)').text();
   balance=toNum(balance);
-  $('input[name="amount"]').val(fmt(balance));
-  $('input[name="balance"]').val(fmt(balance));
-  $('input[name="paying_amount"]').val(fmt(balance));
+  $('input[name="amount"]').val(fmt(balance).replace(",", ""));
+  $('input[name="balance"]').val(fmt(balance).replace(",", ""));
+  $('input[name="paying_amount"]').val(fmt(balance).replace(",", ""));
   $('input[name="purchase_id"]').val(id);
 });
 
@@ -807,9 +1058,9 @@ $(document).on("click","table.payment-list .edit-btn",function(){
       }
       $('input[name="edit_date"]').val(payment_date[index]);
       $("#payment_reference").html(payment_reference[index]);
-      $('input[name="edit_amount"]').val(fmt(paid_amount[index]));
-      $('input[name="edit_paying_amount"]').val(fmt(paying_amount[index]));
-      $('.change').text(fmt(change[index]));
+      $('input[name="edit_amount"]').val(fmt(paid_amount[index]).replace(",", ""));
+      $('input[name="edit_paying_amount"]').val(fmt(paying_amount[index]).replace(",", ""));
+      $('.change').text(fmt(change[index]).replace(",", ""));
       $('textarea[name="edit_payment_note"]').val(payment_note[index]);
       return false;
     }
@@ -855,6 +1106,7 @@ $('input[name="edit_paying_amount"]').on("input", function() {
    Purchase Details (modal) — all numbers via fmt()
 ========================================================= */
 function purchaseDetails(purchase) {
+  window.currentPurchaseRaw = purchase;
   var htmltext = `
     <div class="row">
       <h3 style="text-align:center;margin:0 auto;width:51%;margin-bottom:17px;margin-top:-18px;font-weight:700;">#  `+purchase[31]+`</h3>
@@ -1024,6 +1276,7 @@ function purchaseDetails(purchase) {
    Print button (already above) & misc
 ========================================================= */
 $("#close-btn").on("click", function(){ $('#purchase-details').modal('hide'); });
+$('#purchase-excel-btn').on('click', exportPurchaseExcel);
 
 /* Delete payment confirm */
 $(document).on('submit','form.delete-payment-form', async function(e){

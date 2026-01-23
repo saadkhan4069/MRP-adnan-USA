@@ -734,9 +734,14 @@ lims_productcodeSearch.autocomplete({
 // qty change
 $("#myTable").on('input', '.qty', function() {
   rowindex = $(this).closest('tr').index();
-  if($(this).val() < 0 && $(this).val() != '') {
+  var qty_value = parseFloat($(this).val()) || 0;
+  if(qty_value < 0 && $(this).val() != '') {
     $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(1);
     alert("Quantity can't be less than 0");
+    qty_value = 1;
+  }
+  if(qty_value > 0) {
+    calculateRowProductData(qty_value);
   }
 });
 
@@ -1005,7 +1010,12 @@ function productSearch(data) {
           if(data[16]) wholesale_price.splice(rowindex, 0, parseFloat(data[16] * currency['exchange_rate']) + parseFloat(data[16] * currency['exchange_rate'] * customer_group_rate));
           else         wholesale_price.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
 
-          cost.splice(rowindex, 0, parseFloat(data[17] * currency['exchange_rate']));
+          // Fix cost calculation - handle undefined/null values
+          var productCost = (data[17] !== undefined && data[17] !== null) ? parseFloat(data[17]) : 0;
+          var exchangeRate = (currency['exchange_rate'] !== undefined && currency['exchange_rate'] !== null) ? parseFloat(currency['exchange_rate']) : 1;
+          var calculatedCost = productCost * exchangeRate;
+          if(isNaN(calculatedCost)) calculatedCost = 0;
+          cost.splice(rowindex, 0, calculatedCost);
           product_discount.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
           tax_rate.splice(rowindex, 0, parseFloat(data[3]));
           tax_name.splice(rowindex, 0, data[4]);
@@ -1015,6 +1025,10 @@ function productSearch(data) {
           unit_operation_value.splice(rowindex, 0, data[8]);
           is_imei.splice(rowindex, 0, data[13]);
           is_variant.splice(rowindex, 0, data[14]);
+          
+          // Calculate price and subtotal for newly added product
+          var initial_qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val()) || 1;
+          calculateRowProductData(initial_qty);
         }
         else if(data[18]) {
           var imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val();
@@ -1059,7 +1073,14 @@ function edit() {
     }
   }
   populatePriceOption();
-  $("#product-cost").text(cost[rowindex]);
+  
+  // Fix NaN issue in cost display
+  var costValue = cost[rowindex];
+  if(costValue === undefined || costValue === null || isNaN(costValue)) {
+    costValue = 0;
+  }
+  var formattedCost = parseFloat(costValue).toFixed({{$general_setting->decimal}});
+  $("#product-cost").text(formattedCost);
 
   var row_product_name = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(1)').text();
   var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(2)').text();
@@ -1142,8 +1163,21 @@ function checkQuantity(sale_qty, flag) {
 }
 
 function calculateRowProductData(quantity) {
-  if(product_type[pos] == 'standard') unitConversion();
-  else row_product_price = product_price[rowindex];
+  // Set pos variable for current product
+  var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-code').val();
+  pos = product_code.indexOf(row_product_code);
+  
+  // Initialize row_product_price
+  if(pos >= 0 && product_type[pos] == 'standard') {
+    unitConversion();
+  } else {
+    row_product_price = product_price[rowindex] || 0;
+  }
+  
+  // Ensure row_product_price is valid
+  if(!row_product_price || isNaN(row_product_price)) {
+    row_product_price = product_price[rowindex] || 0;
+  }
 
   $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
   $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));

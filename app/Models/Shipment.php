@@ -24,6 +24,11 @@ class Shipment extends Model
         'ship_from_zipcode',
         'ship_from_contact',
         'ship_from_email',
+        'ship_from_dock_hours',
+        'ship_from_lunch_hour',
+        'ship_from_pickup_delivery_instructions',
+        'ship_from_appointment',
+        'ship_from_accessorial',
         'ship_to_company',
         'ship_to_first_name',
         'ship_to_address_1',
@@ -33,6 +38,11 @@ class Shipment extends Model
         'ship_to_zipcode',
         'ship_to_contact',
         'ship_to_email',
+        'ship_to_dock_hours',
+        'ship_to_lunch_hour',
+        'ship_to_pickup_delivery_instructions',
+        'ship_to_appointment',
+        'ship_to_accessorial',
         'currency_id',
         'exchange_rate',
         'service_code',
@@ -43,6 +53,7 @@ class Shipment extends Model
         'incoterms',
         'contents_type',
         'declared_value_total',
+        'commodity_name',
         'order_tax_rate',
         'order_discount',
         'shipping_cost',
@@ -62,6 +73,8 @@ class Shipment extends Model
         'account_number',
         'tracking_number',
         'label_format',
+        'pickup_date_time',
+        'dropoff_date_time',
         'label_url',
         'invoice_url',
         'customs_docs_url',
@@ -94,6 +107,11 @@ class Shipment extends Model
     public function attachments()
 {
     return $this->hasMany(\App\Models\ShipmentAttachment::class, 'shipment_id');
+}
+
+    public function currency()
+    {
+        return $this->belongsTo(\App\Models\Currency::class, 'currency_id');
 }
 
 }

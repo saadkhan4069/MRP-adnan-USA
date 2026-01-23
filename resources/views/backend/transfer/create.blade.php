@@ -264,12 +264,8 @@ $('select[name="from_warehouse_id"]').on('change', function() {
         product_name = data[1];
         product_qty = data[2];
         product_warehouse_price = data[7];
-        is_embeded = data[11];
-        imei_number = data[12];
         $.each(product_code, function(index) {
-            lims_product_array.push(product_code[index]+'|'+product_name[index]+'|'+imei_number[index]+'|'+is_embeded[index]+'|'+product_qty[index]+'|');
-
-           // lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')');
+            lims_product_array.push(product_code[index]+'|'+product_name[index]);
         });
     });
 });
@@ -309,7 +305,15 @@ lims_productcodeSearch.autocomplete({
 //Change quantity
 $("#myTable").on('input', '.qty', function() {
     rowindex = $(this).closest('tr').index();
-    checkQuantity($(this).val(), true);
+    var qty_value = parseFloat($(this).val()) || 0;
+    if(qty_value < 0) {
+        $(this).val(1);
+        qty_value = 1;
+        alert("Quantity can't be less than 0");
+    }
+    if(qty_value > 0) {
+        checkQuantity(qty_value, true);
+    }
 });
 
 $("#myTable").on("change", ".batch-no", function () {
@@ -408,50 +412,27 @@ function productSearch(data){
     $(".product-code").each(function(i) {
         if ($(this).val() == code) {
             rowindex = i;
-            if(product_info[2] != 'null') {
-                imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .imei-number').val();
-                imeiNumbersArray = imeiNumbers.split(",");
-                // console.log('arra '+ rowindex);
-
-                if(imeiNumbersArray.includes(product_info[2])) {
-                    alert('Same imei or serial number is not allowed!');
-                    flag = false;
-                    $('#lims_productcodeSearch').val('');
-                }
-            }
             pre_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val();
         }
-        // if ($(this).val() == code && (product_info[2] == 'null')) {
-        //     rowindex = i;
-
-        //     pre_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val();
-        // } else if ($(this).val() == code && (product_info[2] != 'null')){
-        //     rowindex = i;
-
-        //     imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .imei-number').val();
-        //     imeiNumbersArray = imeiNumbers.split(",");
-
-        //     if(imeiNumbersArray.includes(product_info[2])) {
-        //         alert('Same imei or serial number is not allowed!');
-        //         flag = 0;
-        //         $('#lims_productcodeSearch').val('');
-        //     } else {
-        //         pre_qty = 0;
-        //         flag = 1;
-        //     }
-
-        // }
     });
     if(flag)
     {
-        data += '?'+$('#customer_id').val()+'?'+(parseFloat(pre_qty) + 1);
+        // Transfer mein customer nahi hota, isliye 0 use karte hain
+        var warehouse_id = $('select[name="from_warehouse_id"]').val();
+        if(!warehouse_id) {
+            alert('Pehlay From Warehouse select karein!');
+            $('#lims_productcodeSearch').val('');
+            return;
+        }
+        data += '?0?'+(parseFloat(pre_qty) + 1);
         console.log(data);
 
         $.ajax({
             type: 'GET',
             url: 'lims_product_search',
             data: {
-                data: data
+                data: data,
+                warehouse_id: $('select[name="from_warehouse_id"]').val()
             },
             success: function(data) {
                 var flag = 1;
@@ -515,7 +496,20 @@ function productSearch(data){
                     unit_operator.splice(rowindex, 0, data[7]);
                     unit_operation_value.splice(rowindex, 0, data[8]);
                     is_imei.splice(rowindex, 0, data[12]);
-                    checkQuantity(1, true);
+                    
+                    // Initialize row_product_cost before calculation
+                    row_product_cost = product_cost[rowindex] || 0;
+                    
+                    // Ensure calculation happens after product is added
+                    if(data[15] >= 1) {
+                        // Set pos for current product
+                        var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-code').val();
+                        pos = product_code.indexOf(row_product_code);
+                        
+                        // Calculate immediately after adding product
+                        var initial_qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val()) || 1;
+                        checkQuantity(initial_qty, true);
+                    }
                     if(data[12]) {
                         $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.edit-product').click();
                     }
@@ -621,7 +615,18 @@ function checkQuantity(purchase_qty, flag) {
 }
 
 function calculateRowProductData(quantity) {
-    unitConversion();
+    // Ensure row_product_cost is properly initialized
+    if(product_cost[rowindex] !== undefined && product_cost[rowindex] !== null) {
+        unitConversion();
+    } else {
+        row_product_cost = product_cost[rowindex] || 0;
+    }
+    
+    // Ensure row_product_cost is valid
+    if(!row_product_cost || isNaN(row_product_cost)) {
+        row_product_cost = product_cost[rowindex] || 0;
+    }
+    
     $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
 
     if (tax_method[rowindex] == 1) {

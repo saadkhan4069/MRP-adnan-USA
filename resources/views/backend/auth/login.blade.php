@@ -35,33 +35,260 @@
     @endif
   </head>
   <body>
+    <style>
+      .professional-login-wrapper {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+      }
+      .login-image-section {
+        flex: 1;
+        background: linear-gradient(135deg, rgba(124, 92, 196, 0.9), rgba(156, 39, 176, 0.9)),
+                    url('{{ asset("images/login.png") }}');
+        background-size: cover;
+        background-position: center;
+        background-blend-mode: overlay;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 186px;
+        position: relative;
+      }
+      .login-image-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        /* background: rgba(0, 0, 0, 0.3); */
+      }
+      .login-image-content {
+        position: relative;
+        z-index: 1;
+        color: white;
+        text-align: center;
+        max-width: 500px;
+      }
+      .login-image-content h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      }
+      .login-image-content p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        opacity: 0.95;
+      }
+      .login-form-section {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: #f7f2fc;
+      }
+      .professional-form-inner {
+        width: 100%;
+        max-width: 450px;
+        background: #fff;
+        border-radius: 12px;
+        /*padding: 50px 40px;*/
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      }
+      .professional-logo {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+      .professional-logo img {
+        max-width: 150px;
+        height: auto;
+      }
+      .professional-logo span {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #7c5cc4;
+      }
+      .professional-form-inner h2 {
+        text-align: center;
+        color: #333;
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .professional-form-inner .subtitle {
+        text-align: center;
+        color: #666;
+        font-size: 0.95rem;
+        margin-bottom: 30px;
+      }
+      .form-group-material {
+        position: relative;
+        margin-bottom: 25px;
+      }
+      .input-material {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #fff;
+      }
+      .input-material:focus {
+        outline: none;
+        border-color: #7c5cc4;
+        box-shadow: 0 0 0 3px rgba(124, 92, 196, 0.1);
+      }
+      .label-material {
+        position: absolute;
+        left: 15px;
+        top: 12px;
+        color: #999;
+        font-size: 1rem;
+        pointer-events: none;
+        transition: all 0.3s ease;
+        background: #fff;
+        padding: 0 5px;
+      }
+      .label-material.active {
+        top: -10px;
+        left: 10px;
+        font-size: 0.85rem;
+        color: #7c5cc4;
+        font-weight: 500;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #845be3, #b6c1ef);
+        border: none;
+        padding: 14px;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(124, 92, 196, 0.3);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(124, 92, 196, 0.4);
+      }
+      .forgot-pass {
+        display: block;
+        text-align: center;
+        margin-top: 20px;
+        color: #7c5cc4;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: color 0.3s ease;
+      }
+      .forgot-pass:hover {
+        color: #9c27b0;
+        text-decoration: none;
+      }
+      .register-section {
+        text-align: center;
+        margin-top: 25px;
+        color: #666;
+        font-size: 0.9rem;
+      }
+      .register-section a {
+        color: #7c5cc4;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .register-section a:hover {
+        color: #9c27b0;
+        text-decoration: underline;
+      }
+      #togglePassword {
+        right: 15px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        color: #999;
+        font-size: 1.1rem;
+      }
+      #togglePassword:hover {
+        color: #7c5cc4;
+      }
+      .copyrights {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+        color: #999;
+        font-size: 0.85rem;
+      }
+      @media (max-width: 768px) {
+        .professional-login-wrapper {
+          flex-direction: column;
+        }
+        .login-image-section {
+          min-height: 300px;
+        }
+        .login-image-content h1 {
+          font-size: 1.8rem;
+        }
+        .professional-form-inner {
+          padding: 40px 30px;
+        }
+      }
+      .alert {
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+    </style>
     <div class="page login-page">
-      <div class="container">
-        <div class="form-outer text-center d-flex align-items-center">
-          <div class="form-inner">
-            <div class="logo">
+      <div class="professional-login-wrapper">
+        <div class="login-image-section">
+          <div class="login-image-content">
+            
+          </div>
+        </div>
+        <div class="login-form-section">
+          <div class="professional-form-inner">
+            <div class="professional-logo">
                 @if($general_setting->site_logo)
-                <img src="{{url('logo', $general_setting->site_logo)}}" width="110">
+                <!--<img src="{{url('logo', $general_setting->site_logo)}}" alt="Logo">-->
                 @else
-                <span>{{$general_setting->site_title}}</span>
+                <!--<span>{{$general_setting->site_title}}</span>-->
                 @endif
             </div>
+            <h2>Sign In</h2>
+            <p class="subtitle">Enter your credentials to continue</p>
+            
             @if(session()->has('delete_message'))
-            <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{{ session()->get('delete_message') }}</div>
+            <div class="alert alert-danger alert-dismissible text-center">
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+              {{ session()->get('delete_message') }}
+            </div>
             @endif
             @if(session()->has('message'))
-              <div class="alert alert-success alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{!! session()->get('message') !!}</div>
+            <div class="alert alert-success alert-dismissible text-center">
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+              {!! session()->get('message') !!}
+            </div>
             @endif
             @if(session()->has('not_permitted'))
-              <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{{ session()->get('not_permitted') }}</div>
+            <div class="alert alert-danger alert-dismissible text-center">
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+              {{ session()->get('not_permitted') }}
+            </div>
             @endif
+            
             <form method="POST" action="{{ route('login') }}" id="login-form">
               @csrf
               <div class="form-group-material">
                 <input id="login-username" type="text" name="name" required class="input-material" value="">
                 <label for="login-username" class="label-material">{{__('db.UserName')}}</label>
                 @if(session()->has('error'))
-                    <p>
+                    <p style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
                         <strong>{{ session()->get('error') }}</strong>
                     </p>
                 @endif
@@ -70,53 +297,32 @@
               <div class="form-group-material">
                 <input id="login-password" type="password" name="password" required class="input-material" value="">
                 <label for="login-password" class="label-material">{{__('db.Password')}}</label>
-                <!-- Eye Icon -->
                 <span id="togglePassword" class="position-absolute" style="right: 0; top: 50%; transform: translateY(-50%); cursor: pointer;">
                     <i class="fa fa-eye-slash"></i>
                 </span>
                 @if(session()->has('error'))
-                    <p>
+                    <p style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
                         <strong>{{ session()->get('error') }}</strong>
                     </p>
                 @endif
               </div>
+              
               <button type="submit" class="btn btn-primary btn-block">{{__('db.LogIn')}}</button>
             </form>
+            
             <a href="{{ route('password.request') }}" class="forgot-pass">{{__('db.Forgot Password?')}}</a>
+            
             <p class="register-section">
               {{__('db.Do not have an account?')}}
               <a href="{{url('register')}}" class="signup register-section">{{__('db.Register')}}</a>
             </p>
-          </div>
-          <div class="copyrights text-center">
-            <p>{{__('db.Developed By')}} <span class="external">{{$general_setting->developed_by}}</span></p>
+            
+           
           </div>
         </div>
       </div>
 
-      @if(!env('USER_VERIFIED'))
-      <div class="switch-theme" id="switch-theme" style="background-color:rgba(255,255,255,0.9);border:1px solid #999;padding:15px;position:fixed;bottom:0px;left:0px;right:0px;z-index:99">
-        <div class="row">
-          <div class="col-md-4 text-center">
-            <!-- This three button for demo only-->
-            <div class="" style="font-size:11px;color:#666;margin-bottom:15px">Login as</div>
-            <button type="submit" class="btn btn-sm btn-success admin-btn">Admin</button>
-            <button type="submit" class="btn btn-sm btn-info staff-btn">Staff</button>
-            <button type="submit" class="btn btn-sm btn-dark customer-btn">Customer</button>
-          </div>
-          <div class="col-md-8 text-center">
-            <hr class="d-lg-none d-md-none d-sm-block">
-            <div class="text-center" style="font-size:11px;color:#666;margin-bottom:15px">Premium Add-ons</div>
-            <a href="?demo_db_name=saleprop_salepro" class="btn btn-primary btn-sm demo-btn">Default</a>
-            <a href="?demo_db_name=saleprop_ecom" class="btn btn-primary btn-sm demo-btn">eCommerce</a>
-            <!-- <a href="?demo_type=saleprop_woo" class="btn btn-primary btn-sm demo-btn">WooCommerce</a>
-            <a href="?demo_type=salepro_restaurant" class="btn btn-primary btn-sm demo-btn">Restaurant</a> -->
-            <a href="https://lion-coders.com/software/salepro-saas-pos-inventory-saas-php-script"  target="_blank" class="btn btn-primary btn-sm">SAAS</a>
-                        <br><br>
-          </div>
-        </div>
-      </div>
-      @endif
+     
     </div>
   </body>
 </html>

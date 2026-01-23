@@ -548,46 +548,20 @@ class TransferController extends Controller
     public function limsProductSearch(Request $request)
     {
         $todayDate = date('Y-m-d');
-        $product_data = explode("|", $request['data']);
-        // $product_code = explode("(", $request['data']);
         $product_info = explode("|", $request['data']);
-
-
-        $customer_id = $product_info[1];
-        // if(strpos($request['data'], '|')) {
-        //     $product_info = explode("|", $request['data']);
-        //     $embeded_code = $product_code[0];
-        //     $product_code[0] = substr($embeded_code, 0, 7);
-        //     $qty = substr($embeded_code, 7, 5) / 1000;
-        // }
-        // else {
-        //     $product_code[0] = rtrim($product_code[0], " ");
-        //     $qty = $product_info[2];
-        // }
-        if($product_data[3][0]) {
-            $product_info = explode("|", $request['data']);
-            $embeded_code = $product_data[0];
-            $product_data[0] = substr($embeded_code, 0, 7);
-            $qty = substr($embeded_code, 7, 5) / 1000;
-        }
-        else {
-            $qty = $product_info[3];
-        }
+        
+        // Simple format: code|name (like purchase/sale)
+        $product_code = $product_info[0];
+        $customer_id = isset($product_info[1]) ? $product_info[1] : 0;
+        $qty = isset($product_info[2]) ? $product_info[2] : 1;
+        
+        // Get warehouse_id from request if available
+        $warehouse_id = $request->input('warehouse_id');
         $product_variant_id = null;
-        $all_discount = DB::table('discount_plan_customers')
-                        ->join('discount_plans', 'discount_plans.id', '=', 'discount_plan_customers.discount_plan_id')
-                        ->join('discount_plan_discounts', 'discount_plans.id', '=', 'discount_plan_discounts.discount_plan_id')
-                        ->join('discounts', 'discounts.id', '=', 'discount_plan_discounts.discount_id')
-                        ->where([
-                            ['discount_plans.is_active', true],
-                            ['discounts.is_active', true],
-                            ['discount_plan_customers.customer_id', $customer_id]
-                        ])
-                        ->select('discounts.*')
-                        ->get();
-        // return $product_data[0];
+        
+        // Simple format: code|name|customer_id|qty
         $lims_product_data = Product::where([
-            ['code', $product_data[0]],
+            ['code', $product_code],
             ['is_active', true]
         ])->first();
 
@@ -595,7 +569,7 @@ class TransferController extends Controller
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
                 ->select('products.*', 'product_variants.id as product_variant_id', 'product_variants.item_code', 'product_variants.additional_cost')
                 ->where([
-                    ['product_variants.item_code', $product_data[0]],
+                    ['product_variants.item_code', $product_code],
                     ['products.is_active', true]
                 ])->first();
 
@@ -680,16 +654,28 @@ class TransferController extends Controller
             $product[] = 'n/a'. ',';
             $product[] = 'n/a'. ',';
         }
+        // Get available quantity from warehouse
+        $available_qty = 0;
+        if($warehouse_id) {
+            $product_warehouse = \App\Models\Product_Warehouse::where([
+                ['product_id', $lims_product_data->id],
+                ['warehouse_id', $warehouse_id]
+            ])->first();
+            if($product_warehouse) {
+                $available_qty = $product_warehouse->qty;
+            }
+        }
+        
         $product[] = $lims_product_data->id;
         $product[] = $product_variant_id;
         $product[] = $lims_product_data->promotion;
         $product[] = $lims_product_data->is_batch;
         $product[] = $lims_product_data->is_imei;
         $product[] = $lims_product_data->is_variant;
-        $product[] = $product_data[4];
+        $product[] = $available_qty; // Available quantity from warehouse
         $product[] = $lims_product_data->wholesale_price;
         $product[] = $lims_product_data->cost;
-        $product[] = $product_data[2];
+        $product[] = $qty; // Requested quantity
         return $product;
 
     }

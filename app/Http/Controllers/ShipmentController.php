@@ -45,9 +45,7 @@ class ShipmentController extends Controller
         $currency_list = Currency::where('is_active', true)->get();
         $lims_tax_list = Tax::where('is_active', true)->get();
         $units = Unit::where('is_active', true)->get();
-        $lims_product_list_without_variant = Product::where('is_active', true)
-            
-            ->get();
+        $lims_product_list_without_variant = Product::where('is_active', true)->get();
         $lims_product_list_with_variant = Product::where('is_active', true)
            
             ->get();
@@ -64,9 +62,9 @@ class ShipmentController extends Controller
         ));
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
+      public function store(Request $request)
+      {
+            $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'ship_from_first_name' => 'required|string|max:255',
             'ship_from_address_1' => 'required|string|max:500',
@@ -110,6 +108,11 @@ class ShipmentController extends Controller
                 'ship_from_zipcode' => $request->ship_from_zipcode,
                 'ship_from_contact' => $request->ship_from_contact,
                 'ship_from_email' => $request->ship_from_email,
+                'ship_from_dock_hours' => $request->ship_from_dock_hours,
+                'ship_from_lunch_hour' => $request->ship_from_lunch_hour,
+                'ship_from_pickup_delivery_instructions' => $request->ship_from_pickup_delivery_instructions,
+                'ship_from_appointment' => $request->ship_from_appointment,
+                'ship_from_accessorial' => $request->ship_from_accessorial,
                 'ship_to_company' => $request->ship_to_company,
                 'ship_to_first_name' => $request->ship_to_first_name,
                 'ship_to_address_1' => $request->ship_to_address_1,
@@ -119,6 +122,11 @@ class ShipmentController extends Controller
                 'ship_to_zipcode' => $request->ship_to_zipcode,
                 'ship_to_contact' => $request->ship_to_contact,
                 'ship_to_email' => $request->ship_to_email,
+                'ship_to_dock_hours' => $request->ship_to_dock_hours,
+                'ship_to_lunch_hour' => $request->ship_to_lunch_hour,
+                'ship_to_pickup_delivery_instructions' => $request->ship_to_pickup_delivery_instructions,
+                'ship_to_appointment' => $request->ship_to_appointment,
+                'ship_to_accessorial' => $request->ship_to_accessorial,
                 'currency_id' => $request->currency_id,
                 'exchange_rate' => $request->exchange_rate,
                 'order_tax_rate' => $request->order_tax_rate ?? 0,
@@ -134,11 +142,10 @@ class ShipmentController extends Controller
                 'grand_total' => $request->grand_total ?? 0,
                 'paid_amount' => $request->paid_amount ?? 0,
                 'payment_status' => $request->payment_status ?? 1,
-                'user_id' => Auth::id(),
             ]);
 
-            // Create packages
-            if ($request->has('packages')) {
+              // Create packages
+              if ($request->has('packages')) {
                 foreach ($request->packages as $packageData) {
                     ShipmentPackage::create([
                         'shipment_id' => $shipment->id,
@@ -183,13 +190,16 @@ class ShipmentController extends Controller
                 'user_agent' => $request->userAgent(),
             ]);
 
-            DB::commit();
+              DB::commit();
 
             return redirect()->route('shipment.show', $shipment->id)
                 ->with('message', 'Shipment created successfully');
 
         } catch (\Exception $e) {
             DB::rollback();
+            \Log::error('Shipment Create Error: ' . $e->getMessage());
+            \Log::error('Stack Trace: ' . $e->getTraceAsString());
+            \Log::error('Request Data: ' . json_encode($request->all()));
             return back()->withInput()->withErrors(['error' => 'Failed to create shipment: ' . $e->getMessage()]);
         }
     }
@@ -261,7 +271,7 @@ class ShipmentController extends Controller
             DB::beginTransaction();
 
             $oldStatus = $shipment->status;
-            
+
             $shipment->update([
                 'po_no' => $request->po_no,
                 'reference_no' => $request->reference_no,
@@ -276,6 +286,11 @@ class ShipmentController extends Controller
                 'ship_from_zipcode' => $request->ship_from_zipcode,
                 'ship_from_contact' => $request->ship_from_contact,
                 'ship_from_email' => $request->ship_from_email,
+                'ship_from_dock_hours' => $request->ship_from_dock_hours,
+                'ship_from_lunch_hour' => $request->ship_from_lunch_hour,
+                'ship_from_pickup_delivery_instructions' => $request->ship_from_pickup_delivery_instructions,
+                'ship_from_appointment' => $request->ship_from_appointment,
+                'ship_from_accessorial' => $request->ship_from_accessorial,
                 'ship_to_company' => $request->ship_to_company,
                 'ship_to_first_name' => $request->ship_to_first_name,
                 'ship_to_address_1' => $request->ship_to_address_1,
@@ -285,6 +300,11 @@ class ShipmentController extends Controller
                 'ship_to_zipcode' => $request->ship_to_zipcode,
                 'ship_to_contact' => $request->ship_to_contact,
                 'ship_to_email' => $request->ship_to_email,
+                'ship_to_dock_hours' => $request->ship_to_dock_hours,
+                'ship_to_lunch_hour' => $request->ship_to_lunch_hour,
+                'ship_to_pickup_delivery_instructions' => $request->ship_to_pickup_delivery_instructions,
+                'ship_to_appointment' => $request->ship_to_appointment,
+                'ship_to_accessorial' => $request->ship_to_accessorial,
                 'currency_id' => $request->currency_id,
                 'exchange_rate' => $request->exchange_rate,
                 'order_tax_rate' => $request->order_tax_rate ?? 0,
@@ -433,6 +453,36 @@ class ShipmentController extends Controller
                     $shipment->ship_to_country
                 ]);
                 return implode(', ', $parts) ?: '—';
+            })
+            ->addColumn('ship_from_dock_hours', function ($shipment) {
+                return $shipment->ship_from_dock_hours ?? '—';
+            })
+            ->addColumn('ship_from_lunch_hour', function ($shipment) {
+                return $shipment->ship_from_lunch_hour ?? '—';
+            })
+            ->addColumn('ship_from_pickup_delivery_instructions', function ($shipment) {
+                return $shipment->ship_from_pickup_delivery_instructions ?? '—';
+            })
+            ->addColumn('ship_from_appointment', function ($shipment) {
+                return $shipment->ship_from_appointment ?? '—';
+            })
+            ->addColumn('ship_from_accessorial', function ($shipment) {
+                return $shipment->ship_from_accessorial ?? '—';
+            })
+            ->addColumn('ship_to_dock_hours', function ($shipment) {
+                return $shipment->ship_to_dock_hours ?? '—';
+            })
+            ->addColumn('ship_to_lunch_hour', function ($shipment) {
+                return $shipment->ship_to_lunch_hour ?? '—';
+            })
+            ->addColumn('ship_to_pickup_delivery_instructions', function ($shipment) {
+                return $shipment->ship_to_pickup_delivery_instructions ?? '—';
+            })
+            ->addColumn('ship_to_appointment', function ($shipment) {
+                return $shipment->ship_to_appointment ?? '—';
+            })
+            ->addColumn('ship_to_accessorial', function ($shipment) {
+                return $shipment->ship_to_accessorial ?? '—';
             })
             ->addColumn('totals', function ($shipment) {
                 return [

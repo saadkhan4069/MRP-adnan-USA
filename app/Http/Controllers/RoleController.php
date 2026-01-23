@@ -86,6 +86,7 @@ class RoleController extends Controller
         if(!env('USER_VERIFIED'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
+        try {
         $role = Role::firstOrCreate(['id' => $request['role_id']]);
 
         if($request->has('revenue_profit_summary')){
@@ -94,8 +95,11 @@ class RoleController extends Controller
                 $role->givePermissionTo($permission);
             }
         }
-        else
+            else {
+                $permission = Permission::where('name', 'revenue_profit_summary')->first();
+                if($permission && $role->hasPermissionTo('revenue_profit_summary'))
             $role->revokePermissionTo('revenue_profit_summary');
+            }
 
         if($request->has('cash_flow')){
             $permission = Permission::firstOrCreate(['name' => 'cash_flow']);
@@ -103,8 +107,11 @@ class RoleController extends Controller
                 $role->givePermissionTo($permission);
             }
         }
-        else
+            else {
+                $permission = Permission::where('name', 'cash_flow')->first();
+                if($permission && $role->hasPermissionTo('cash_flow'))
             $role->revokePermissionTo('cash_flow');
+            }
 
         if($request->has('monthly_summary')){
             $permission = Permission::firstOrCreate(['name' => 'monthly_summary']);
@@ -1315,9 +1322,229 @@ class RoleController extends Controller
                 $role->revokePermissionTo('addons');
         }
 
+            if($request->has('shipments-index')){
+                $permission = Permission::firstOrCreate(['name' => 'shipments-index']);
+                if(!$role->hasPermissionTo('shipments-index')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'shipments-index')->first();
+                    if($permission && $role->hasPermissionTo('shipments-index'))
+                        $role->revokePermissionTo('shipments-index');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('shipments-add')){
+                $permission = Permission::firstOrCreate(['name' => 'shipments-add']);
+                if(!$role->hasPermissionTo('shipments-add')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'shipments-add')->first();
+                    if($permission && $role->hasPermissionTo('shipments-add'))
+                        $role->revokePermissionTo('shipments-add');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('shipments-edit')){
+                $permission = Permission::firstOrCreate(['name' => 'shipments-edit']);
+                if(!$role->hasPermissionTo('shipments-edit')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'shipments-edit')->first();
+                    if($permission && $role->hasPermissionTo('shipments-edit'))
+                        $role->revokePermissionTo('shipments-edit');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('shipments-delete')){
+                $permission = Permission::firstOrCreate(['name' => 'shipments-delete']);
+                if(!$role->hasPermissionTo('shipments-delete')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'shipments-delete')->first();
+                    if($permission && $role->hasPermissionTo('shipments-delete'))
+                        $role->revokePermissionTo('shipments-delete');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('shipments-view')){
+                $permission = Permission::firstOrCreate(['name' => 'shipments-view']);
+                if(!$role->hasPermissionTo('shipments-view')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'shipments-view')->first();
+                    if($permission && $role->hasPermissionTo('shipments-view'))
+                        $role->revokePermissionTo('shipments-view');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('woocommerce-index')){
+                $permission = Permission::firstOrCreate(['name' => 'woocommerce-index']);
+                if(!$role->hasPermissionTo('woocommerce-index')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'woocommerce-index')->first();
+                    if($permission && $role->hasPermissionTo('woocommerce-index'))
+                        $role->revokePermissionTo('woocommerce-index');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('woocommerce-add')){
+                $permission = Permission::firstOrCreate(['name' => 'woocommerce-add']);
+                if(!$role->hasPermissionTo('woocommerce-add')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'woocommerce-add')->first();
+                    if($permission && $role->hasPermissionTo('woocommerce-add'))
+                        $role->revokePermissionTo('woocommerce-add');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('woocommerce-edit')){
+                $permission = Permission::firstOrCreate(['name' => 'woocommerce-edit']);
+                if(!$role->hasPermissionTo('woocommerce-edit')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'woocommerce-edit')->first();
+                    if($permission && $role->hasPermissionTo('woocommerce-edit'))
+                        $role->revokePermissionTo('woocommerce-edit');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('woocommerce-delete')){
+                $permission = Permission::firstOrCreate(['name' => 'woocommerce-delete']);
+                if(!$role->hasPermissionTo('woocommerce-delete')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'woocommerce-delete')->first();
+                    if($permission && $role->hasPermissionTo('woocommerce-delete'))
+                        $role->revokePermissionTo('woocommerce-delete');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('woocommerce-api-settings')){
+                $permission = Permission::firstOrCreate(['name' => 'woocommerce-api-settings']);
+                if(!$role->hasPermissionTo('woocommerce-api-settings')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'woocommerce-api-settings')->first();
+                    if($permission && $role->hasPermissionTo('woocommerce-api-settings'))
+                        $role->revokePermissionTo('woocommerce-api-settings');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('purchase-shipment-list')){
+                $permission = Permission::firstOrCreate(['name' => 'purchase-shipment-list', 'guard_name' => 'web']);
+                if(!$role->hasPermissionTo('purchase-shipment-list')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'purchase-shipment-list')->first();
+                    if($permission && $role->hasPermissionTo('purchase-shipment-list'))
+                        $role->revokePermissionTo('purchase-shipment-list');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('courier')){
+                $permission = Permission::firstOrCreate(['name' => 'courier', 'guard_name' => 'web']);
+                if(!$role->hasPermissionTo('courier')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'courier')->first();
+                    if($permission && $role->hasPermissionTo('courier'))
+                        $role->revokePermissionTo('courier');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('challan-report')){
+                $permission = Permission::firstOrCreate(['name' => 'challan-report', 'guard_name' => 'web']);
+                if(!$role->hasPermissionTo('challan-report')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'challan-report')->first();
+                    if($permission && $role->hasPermissionTo('challan-report'))
+                        $role->revokePermissionTo('challan-report');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('inventory-movement')){
+                $permission = Permission::firstOrCreate(['name' => 'inventory-movement', 'guard_name' => 'web']);
+                if(!$role->hasPermissionTo('inventory-movement')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'inventory-movement')->first();
+                    if($permission && $role->hasPermissionTo('inventory-movement'))
+                        $role->revokePermissionTo('inventory-movement');
+                } catch (\Exception $e) {}
+            }
+
+            if($request->has('appointments')){
+                $permission = Permission::firstOrCreate(['name' => 'appointments', 'guard_name' => 'web']);
+                if(!$role->hasPermissionTo('appointments')){
+                    $role->givePermissionTo($permission);
+                }
+            }
+            else {
+                try {
+                    $permission = Permission::where('name', 'appointments')->first();
+                    if($permission && $role->hasPermissionTo('appointments'))
+                        $role->revokePermissionTo('appointments');
+                } catch (\Exception $e) {}
+            }
+
+            // Clear all permission-related caches for all roles
         cache()->forget('permissions');
+            cache()->forget('role_has_permissions');
+            // Clear cache for all roles (1-5)
+            for($i = 1; $i <= 5; $i++) {
+                cache()->forget('role_has_permissions_list' . $i);
+            }
 
         return redirect('role')->with('message', __('db.Permission updated successfully'));
+        } catch (\Exception $e) {
+            \Log::error('Permission update error: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Error updating permissions: ' . $e->getMessage());
+        }
     }
 
     public function destroy($id)

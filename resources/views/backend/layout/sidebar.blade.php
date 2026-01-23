@@ -54,20 +54,61 @@
                 ?>
                 @if($add_permission_active || $isCustomerRole)
                 <li id="purchase-create-menu"><a href="{{route('purchases.create')}}">{{__('db.Add Purchase')}}</a></li>
+                @endif
+                <?php
+                $purchase_import_permission = $role_has_permissions_list->where('name', 'purchases-import')->first();
+                ?>
+                @if($purchase_import_permission)
                 <li id="purchase-import-menu"><a href="{{url('purchases/purchase_by_csv')}}">{{__('db.Import Purchase By CSV')}}</a></li>
-
+                @endif
+                <?php
+                $purchase_shipment_list_permission = $role_has_permissions_list->where('name', 'purchase-shipment-list')->first();
+                ?>
+                @if($purchase_shipment_list_permission)
                <li id="purchaseShipment-menu"><a href="{{route('backend.purchase.shippedview')}}">{{__('Purchase Shipment list')}}</a></li>
                 @endif
             </ul>
             </li>
             @endif
+            <?php
+                $shipment_index_permission_active = $role_has_permissions_list->where('name', 'shipments-index')->first();
+                $shipment_add_permission_active = $role_has_permissions_list->where('name', 'shipments-add')->first();
+              
+              
+            ?>
+            @if($shipment_index_permission_active || $shipment_add_permission_active)
             <li><a href="#AddShipment" aria-expanded="false" data-toggle="collapse"> <i class="fa fa-truck"></i><span>{{__('Shipping / Logistic')}}</span></a>
             <ul id="AddShipment" class="collapse list-unstyled ">
+                @if($shipment_index_permission_active)
+                <li id="shipment-dashboard-menu"><a href="{{route('shipment.dashboard')}}">{{__('Shipment Dashboard')}}</a></li>
+                <li id="shipmentview-list-menu"><a href="{{route('shipment.index')}}">{{__('Shipment List')}}</a></li>
+                @endif
+                @if($shipment_add_permission_active)
                 <li id="AddShipment-menu"><a href="{{route('shipment.create')}}">{{__('Add Shipment')}}</a></li>
-                 <li id="shipmentview-list-menu"><a href="">{{__('Shipment List')}}</a></li>
-                
+                @endif
             </ul>
             </li>
+            @endif
+            <?php
+                $woocommerce_index_permission_active = $role_has_permissions_list->where('name', 'woocommerce-index')->first();
+                $woocommerce_add_permission_active = $role_has_permissions_list->where('name', 'woocommerce-add')->first();
+                $woocommerce_api_permission_active = $role_has_permissions_list->where('name', 'woocommerce-api-settings')->first();
+            ?>
+            @if($woocommerce_index_permission_active || $woocommerce_add_permission_active || $woocommerce_api_permission_active)
+            <li><a href="#WooCommerce" aria-expanded="false" data-toggle="collapse"> <i class="fa fa-shopping-cart"></i><span>{{__('WooCommerce Orders')}}</span></a>
+            <ul id="WooCommerce" class="collapse list-unstyled ">
+                @if($woocommerce_index_permission_active)
+                <li id="woocommerce-orders-menu"><a href="{{route('woocommerce.orders.index')}}">{{__('Orders List')}}</a></li>
+                @endif
+                @if($woocommerce_add_permission_active)
+                <li id="woocommerce-create-menu"><a href="{{route('woocommerce.orders.create')}}">{{__('Add Order')}}</a></li>
+                @endif
+                @if($woocommerce_api_permission_active)
+                <li id="woocommerce-api-menu"><a href="{{route('woocommerce.api-settings')}}">{{__('API Settings')}}</a></li>
+                @endif
+            </ul>
+            </li>
+            @endif
             <?php
                 $sale_index_permission_active = $role_has_permissions_list->where('name', 'sales-index')->first();
 
@@ -105,7 +146,12 @@
                 @if($coupon_permission_active)
                 <li id="coupon-menu"><a href="{{route('coupons.index')}}">{{__('db.Coupon List')}}</a> </li>
                 @endif
+                <?php
+                $courier_permission_active = $role_has_permissions_list->where('name', 'courier')->first();
+                ?>
+                @if($courier_permission_active)
                 <li id="courier-menu"><a href="{{route('couriers.index')}}">{{__('db.Courier List')}}</a> </li>
+                @endif
             </ul>
             </li>
             @endif
@@ -416,7 +462,12 @@
                 {!! Form::close() !!}
                 </li>
                 @endif
+                <?php
+                $challan_report_permission_active = $role_has_permissions_list->where('name', 'challan-report')->first();
+                ?>
+                @if($challan_report_permission_active)
                 <li id="challan-report-menu"><a href="{{route('report.challan')}}"> {{__('db.Challan Report')}}</a></li>
+                @endif
                 @if($sale_report_chart_active)
                 <li id="sale-report-chart-menu">
                     {!! Form::open(['route' => 'report.saleChart', 'method' => 'post', 'id' => 'sale-report-chart-form']) !!}
@@ -519,6 +570,10 @@
             </li>
             @endif
 
+            <?php
+            $inventory_movement_permission_active = $role_has_permissions_list->where('name', 'inventory-movement')->first();
+            ?>
+            @if($inventory_movement_permission_active)
             <!-- Inventory Movement Link -->
             <li id="inventory-movement-menu">
                 <a href="{{route('inventory-movement.index')}}">
@@ -526,6 +581,7 @@
                     <span>{{__('Inventory Movement')}}</span>
                 </a>
             </li>
+            @endif
 
             <?php
                 $addons_permission = $role_has_permissions_list->where('name', 'addons')->first();
@@ -544,7 +600,7 @@
                         </ul>
                     </li>
                     @endif
-                    @if (in_array('woocommerce',explode(',',$general_setting->modules)))
+                    @if (in_array('woocommerce',explode(',',$general_setting->modules)) && Route::has('woocommerce.index'))
                         <li><a href="{{route('woocommerce.index')}}"> <i class="fa fa-wordpress"></i><span>WooCommerce</span></a></li>
                     @endif
                     @if(in_array('ecommerce',explode(',',$general_setting->modules)))
@@ -560,6 +616,10 @@
                 @endif
             @endif
 
+            <?php
+            $appointments_permission_active = $role_has_permissions_list->where('name', 'appointments')->first();
+            ?>
+            @if($appointments_permission_active)
             <!-- Appointment Scheduling Module -->
             <li><a href="#schedule" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-calendar"></i><span>Appointments</span></a>
                 <ul id="schedule" class="collapse list-unstyled ">
@@ -570,7 +630,18 @@
                     @endif
                 </ul>
             </li>
+            @endif
 
+            <?php
+                // Check if user has any settings permission
+                $has_settings_permission = $role_has_permissions_list->whereIn('name', [
+                    'all_notification', 'send_notification', 'warehouse', 'customer_group', 'brand', 'unit', 
+                    'currency', 'tax', 'general_setting', 'backup_database', 'mail_setting', 'payment_gateway_setting',
+                    'sms_setting', 'create_sms', 'pos_setting', 'hrm_setting', 'barcode_setting', 'language_setting',
+                    'reward_point_setting', 'invoice_setting', 'invoice_create_edit_delete', 'discount_plan', 'discount', 'custom_field'
+                ])->first() || (\Auth::check() && \Auth::user()->role_id <= 2);
+            ?>
+            @if($has_settings_permission  || Auth::user()->role_id === 5 ) 
             <li><a href="#setting" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-gear"></i><span>{{__('db.settings')}}</span></a>
                 <ul id="setting" class="collapse list-unstyled ">
                     <?php
@@ -711,4 +782,5 @@
                     @endif
                 </ul>
             </li>
+            @endif
         </ul>
