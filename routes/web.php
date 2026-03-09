@@ -459,6 +459,8 @@ Route::get('shipment/{shipment}/proforma-invoice', [PurchaseController::class, '
 // Bill of Lading - Store data
 Route::post('shipment/{shipment}/bill-of-lading', [PurchaseController::class, 'shipmentBillOfLadingStore'])
     ->name('shipment.bill-of-lading.store');
+Route::post('shipment/{shipment}/bill-of-lading/check', [PurchaseController::class, 'shipmentBillOfLadingCheck'])
+    ->name('shipment.bill-of-lading.check');
 // Bill of Lading PDF
 Route::get('shipment/{shipment}/bill-of-lading', [PurchaseController::class, 'shipmentBillOfLading'])
     ->name('shipment.bill-of-lading');

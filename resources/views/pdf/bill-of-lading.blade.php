@@ -13,7 +13,7 @@
         }
         .header-bar {
             background-color: #808080;
-            color: #fff;
+            /* color: #ff0000; */
             padding: 8px 10px;
             text-align: center;
             font-weight: bold;
@@ -29,24 +29,49 @@
             display: table-cell;
             width: 50%;
             vertical-align: top;
+            padding-right: 15px;
+        }
+        .header-left-inner {
+            display: table;
+            width: 100%;
+        }
+        .header-left-logo {
+            display: table-cell;
+            width: 40%;
+            vertical-align: top;
+        }
+        .header-left-info {
+            display: table-cell;
+            width: 60%;
+            vertical-align: top;
+            padding-left: 10px;
         }
         .header-right {
             display: table-cell;
             width: 50%;
             vertical-align: top;
+            padding-left: 15px;
             text-align: right;
         }
-        .bol-number p {
+        .bol-number {
+            margin-bottom: 10px;
+        }
+        .bol-number-label {
+            font-size: 11px;
             font-weight: bold;
-            font-size: 30px;
+            margin-bottom: 3px;
+        }
+        .bol-number-value {
+            font-weight: bold;
+            font-size: 36px;
             margin-bottom: 5px;
         }
         .logo-container {
-            margin-top: 5px;
+            margin-bottom: 8px;
         }
         .logo-container img {
-            max-height: 80px;
-            max-width: 140px;
+            max-height: 90px;
+            max-width: 250px;
         }
         .logo-left {
             text-align: left;
@@ -54,15 +79,24 @@
         .logo-right {
             text-align: right;
         }
-        .three-column {
+        .company-info {
+            font-size: 9px;
+            line-height: 1.5;
+        }
+        .third-party-info {
+            font-size: 9px;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+        .two-column {
             display: table;
             width: 100%;
             margin-bottom: 10px;
             border-collapse: collapse;
         }
-        .three-column > div {
+        .two-column > div {
             display: table-cell;
-            width: 33.33%;
+            width: 50%;
             vertical-align: top;
             padding: 5px;
             border: 1px solid #000;
@@ -108,27 +142,25 @@
             margin-top: 15px;
             font-size: 8px;
         }
-        .pro-number {
-            text-align: center;
-            margin-bottom: 10px;
-            font-weight: bold;
-            font-size: 11px;
-        }
-        .freight-terms {
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        .signature-block {
+        .footer-row {
             display: table;
             width: 100%;
             margin-top: 10px;
         }
-        .signature-block > div {
+        .footer-row > div {
             display: table-cell;
-            width: 33.33%;
             vertical-align: top;
             padding: 5px;
             border: 1px solid #000;
+        }
+        .pro-number-box {
+            width: 25%;
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .signature-block {
+            width: 25%;
         }
         .signature-title {
             font-weight: bold;
@@ -136,18 +168,18 @@
             font-size: 8px;
         }
         .signature-text {
-            font-size: 6.5px;
-            line-height: 1.2;
+            font-size: 9px;
+            /* line-height: 1.2; */
         }
         .signature-mark {
-            margin-top: 15px;
+            /* margin-top: 15px; */
             text-align: center;
             font-size: 18px;
             font-weight: bold;
         }
         .special-instructions {
             margin-top: 5px;
-            font-size: 7px;
+            font-size: 10px;
             min-height: 20px;
         }
         .reference-section {
@@ -164,7 +196,7 @@
             text-align: right;
         }
         .barcode-container {
-            text-align: center;
+            /* text-align: center; */
             margin-top: 5px;
         }
         .barcode-container img {
@@ -177,50 +209,105 @@
     {{-- Header Bar --}}
     <div class="header-bar">STRAIGHT BILL OF LADING (NON-NEGOTIABLE)</div>
     
-    {{-- Header Content with Logos and BOL Number --}}
+    {{-- Header Content with Company Info and BOL Number --}}
     <div class="header-content">
         <div class="header-left">
-            @if(!empty($logos['company_logo']))
-            <div class="logo-container logo-left">
-                <img src="{{ public_path('images/logo.webp') }}" alt="Company Logo">
+            <div class="header-left-inner">
+                <div class="header-left-logo">
+                    {{-- Company Logo (Ez-solution) --}}
+                    <div class="logo-container logo-left">
+                    <img src="{{ public_path('images/logo.webp') }}" alt="Company Logo">
+                    </div>
+                    
+                    {{-- Company Address and Contact --}}
+                    <div class="company-info" style="margin-top: 8px; font-size: 9px; line-height: 1.5;">
+                        @if($company_address)
+                        <div>{{ $company_address }}</div>
+                        @endif
+                        @if($company_phone)
+                        <div>Phone: {{ $company_phone }}</div>
+                        @endif
+                        @if($company_fax)
+                        <div>Fax: {{ $company_fax }}</div>
+                        @endif
+                    </div>
+                </div>
+                
+                <div class="header-left-info">
+                    {{-- Pickup Schedule Info --}}
+                    <div style="font-size: 10px; line-height: 1.6; font-weight: normal;">
+                        @if(!empty($carrier['name']))
+                        <div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">{{ $carrier['name'] }}</div>
+                        @endif
+                        @if(!empty($carrier['phone']))
+                        <div style="font-size: 10px; margin-bottom: 5px;">{{ $carrier['phone'] }}</div>
+                        @endif
+                        @if($pickup_date)
+                        <div style="margin-top: 5px; font-size: 10px;"><strong>Pickup Date:</strong> {{ $pickup_date }}</div>
+                        @endif
+                        @if($ready_time)
+                        <div style="font-size: 10px;"><strong>Ready Time:</strong> {{ $ready_time }}</div>
+                        @endif
+                        @if($closing_time)
+                        <div style="font-size: 10px;"><strong>Closing Time:</strong> {{ $closing_time }}</div>
+                        @endif
+                    </div>
+                </div>
             </div>
-            @endif
         </div>
+        
         <div class="header-right">
-            <div class="bol-number">BOL Number: <p>{{ $bol_number }}</p></div>
+            {{-- Third Party Bill-To-Information --}}
+            <div class="third-party-info">
+                <div style="font-weight: bold; margin-bottom: 5px;">Third Party Bill-To-Information</div>
+                @if(!empty($third_party['name']))
+                <div><strong>Carrier:</strong> {{ $third_party['name'] }}</div>
+                @endif
+                @if($company_address)
+                <div>{{ $company_address }}</div>
+                @endif
+                @if(!empty($third_party['account']))
+                <div><strong>Account:</strong> {{ $third_party['account'] }}</div>
+                @endif
+            </div>
+            
+            {{-- Third Party Logo (Right side) --}}
             @if(!empty($logos['third_party_logo']))
-            <div class="logo-container logo-right">
+            <div class="logo-container logo-right" style="margin-top: 10px;">
                 <img src="{{ $logos['third_party_logo'] }}" alt="Third Party Logo">
             </div>
             @endif
+            
+            {{-- BOL Number with Barcode (Rightmost) --}}
+            <div class="bol-number" style="margin-top: 10px;">
+                <div class="bol-number-label">BOL Number:</div>
+                <div class="bol-number-value">{{ $bol_number }}</div>
+                {{-- Barcode for BOL Number --}}
+                <div class="barcode-container">
+                    @php
+                        try {
+                            if (class_exists('\Picqer\Barcode\BarcodeGeneratorPNG')) {
+                                $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
+                                $barcode = base64_encode($generator->getBarcode($bol_number, $generator::TYPE_CODE_128));
+                                echo '<img src="data:image/png;base64,' . $barcode . '" alt="Barcode" style="max-width: 200px; height: auto;">';
+                            } elseif (class_exists('\DNS1D')) {
+                                echo '<img src="data:image/png;base64,' . \DNS1D::getBarcodePNG($bol_number, 'C128') . '" alt="Barcode" style="max-width: 200px; height: auto;">';
+                            }
+                        } catch (\Exception $e) {
+                            // Barcode generation failed, skip it
+                        }
+                    @endphp
+                </div>
+            </div>
         </div>
     </div>
+    
 
-    {{-- Three Column Layout: Shipper | Third Party | Consignee --}}
-    <div class="three-column">
+    {{-- Two Column Layout: Shipper | Consignee --}}
+    <div class="two-column">
         {{-- Shipper Column (Left) --}}
         <div>
-            <div class="column-title">CARRIER</div>
-            <div class="info-row">
-                @if(!empty($carrier['name']))
-                <div><strong>{{ $carrier['name'] }}</strong></div>
-                @endif
-                @if(!empty($carrier['phone']))
-                <div>Phone: {{ $carrier['phone'] }}</div>
-                @endif
-                @if(!empty($carrier['address']))
-                <div>{{ $carrier['address'] }}</div>
-                @endif
-            </div>
-
-            <div class="column-title" style="margin-top: 6px;">PICKUP SCHEDULE</div>
-            <div class="info-row">
-                <div><span class="info-label">Pickup Date:</span> {{ $pickup_date }}</div>
-                <div><span class="info-label">Ready Time:</span> {{ $ready_time }}</div>
-                <div><span class="info-label">Closing Time:</span> {{ $closing_time }}</div>
-            </div>
-
-            <div class="column-title" style="margin-top: 6px;">SHIPPER</div>
+            <div class="column-title">SHIPPER</div>
             <div class="info-row">
                 <div><strong>{{ $shipper['company'] ?: $shipper['name'] }}</strong></div>
                 <div>{{ $shipper['address'] }}</div>
@@ -275,24 +362,6 @@
             @if($shipper['accessorial'] && $shipper['accessorial'] != '—')
             <div class="info-row">
                 <div><span class="info-label">Accessorial:</span> {{ $shipper['accessorial'] }}</div>
-            </div>
-            @endif
-        </div>
-
-        {{-- Third Party Bill-To Column (Center) --}}
-        <div>
-            <div class="column-title">THIRD PARTY BILL-TO</div>
-            <div class="info-row">
-                @if(!empty($third_party['name']))
-                <div><strong>Carrier: {{ $third_party['name'] }}</strong></div>
-                @endif
-                @if(!empty($third_party['address']))
-                <div>{{ $third_party['address'] }}</div>
-                @endif
-            </div>
-            @if(!empty($third_party['account']))
-            <div class="info-row" style="margin-top: 4px;">
-                <div><span class="info-label">Account:</span> {{ $third_party['account'] }}</div>
             </div>
             @endif
         </div>
@@ -398,60 +467,61 @@
             @endforeach
             <tr style="font-weight: bold; background-color: #f0f0f0;">
                 <td colspan="11" class="text-right"><strong>Total Units: {{ $totalUnits }}</strong></td>
-                <td><strong>Total Weight: {{ number_format($totalWeight, 1) }}</strong></td>
+                <td><strong>Total Weight: {{ number_format($totalWeight, 1) }} {{ $package->weight_unit ?? 'kg' }}</strong></td>
             </tr>
         </tbody>
     </table>
 
     {{-- Footer Section --}}
     <div class="footer">
-        <div class="pro-number">
-            <div style="margin-bottom: 5px;">Pro Number: {{ $pro_number }}</div>
-            {{-- Barcode for BOL Number --}}
-            <div class="barcode-container">
-                @php
-                    try {
-                        if (class_exists('\Picqer\Barcode\BarcodeGeneratorPNG')) {
-                            $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
-                            $barcode = base64_encode($generator->getBarcode($bol_number, $generator::TYPE_CODE_128));
-                            echo '<img src="data:image/png;base64,' . $barcode . '" alt="Barcode">';
-                        } elseif (class_exists('\DNS1D')) {
-                            echo '<img src="data:image/png;base64,' . \DNS1D::getBarcodePNG($bol_number, 'C128') . '" alt="Barcode">';
+        {{-- Footer Row: 4 Boxes in One Row --}}
+        <div class="footer-row">
+            {{-- Box 1: Pro Number --}}
+            <div class="pro-number-box">
+                <div style="margin-bottom: 5px;"><strong>Pro Number: {{ $pro_number }}</strong></div>
+                {{-- Barcode for Pro Number --}}
+                <div class="barcode-container">
+                    @php
+                        try {
+                            if (class_exists('\Picqer\Barcode\BarcodeGeneratorPNG')) {
+                                $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
+                                $barcode = base64_encode($generator->getBarcode($pro_number, $generator::TYPE_CODE_128));
+                                echo '<img src="data:image/png;base64,' . $barcode . '" alt="Barcode">';
+                            } elseif (class_exists('\DNS1D')) {
+                                echo '<img src="data:image/png;base64,' . \DNS1D::getBarcodePNG($pro_number, 'C128') . '" alt="Barcode">';
+                            }
+                        } catch (\Exception $e) {
+                            // Barcode generation failed, skip it
                         }
-                    } catch (\Exception $e) {
-                        // Barcode generation failed, skip it
-                    }
-                @endphp
+                    @endphp
+                </div>
             </div>
-        </div>
 
-        <div class="freight-terms">
-            <strong>Freight Charge Terms:</strong><br>
-            {{ $freight_charge_terms }}
-        </div>
-
-        {{-- Signature Blocks --}}
-        <div class="signature-block">
-            <div>
+            {{-- Box 2: Shipper Signature --}}
+            <div class="signature-block">
                 <div class="signature-title">Shipper Signature / Date</div>
                 <div class="signature-text">
                     This is to certify that the above named materials are properly classified, described, packaged, marked and labeled, and are in proper condition for transportation according to the applicable regulations of the U.S. Department of Transportation.
                 </div>
-                <div class="signature-mark">X</div>
+                <!-- <div class="signature-mark">X_____________</div> -->
             </div>
-            <div>
+
+            {{-- Box 3: Carrier Signature --}}
+            <div class="signature-block">
                 <div class="signature-title">Carrier Signature / Date</div>
                 <div class="signature-text">
                     Carrier acknowledges receipt of packages and required placards. Carrier certifies emergency response information was made available and/or carrier has the U.S. Department of Transportation emergency response guidebook or equivalent documentation in the vehicle. Property described above is received in good order, except as noted.
                 </div>
-                <div class="signature-mark">X</div>
+                <!-- <div class="signature-mark">X_____________</div> -->
             </div>
-            <div>
+
+            {{-- Box 4: Consignee Signature --}}
+            <div class="signature-block">
                 <div class="signature-title">Consignee Signature / Date</div>
                 <div class="signature-text">
                     RECEIVED, subject to individually determined rates or contracts that have been agreed upon in writing between the carrier and shipper, if applicable, otherwise to the rates, classifications and rules that have been established by the carrier and are available to the shipper, on request, and to all applicable state and federal regulations.
                 </div>
-                <div class="signature-mark">X</div>
+                <!-- <div class="signature-mark">X_____________</div> -->
             </div>
         </div>
     </div>

@@ -1450,6 +1450,7 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
     {
         // 1) Validate inputs
         $v = $request->validate([
+            'bol_number' => ['nullable','string','max:100'],
             'carrier_name' => ['nullable','string','max:255'],
             'carrier_phone' => ['nullable','string','max:50'],
             'carrier_address' => ['nullable','string'],
@@ -1478,8 +1479,39 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
             }
         }
 
-        // 3) Store Bill of Lading data in meta
+        // 3) Generate BOL Number if not provided (6 digits random)
+        $bolNumber = $v['bol_number'] ?? null;
+        
+        // Check for duplicate if provided
+        if (!empty($bolNumber)) {
+            $existingBol = \App\Models\Shipment::where('id', '!=', $shipment->id)
+                ->whereNotNull('meta')
+                ->whereRaw("JSON_EXTRACT(meta, '$.bill_of_lading.bol_number') = ?", [$bolNumber])
+                ->exists();
+            
+            if ($existingBol) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'BOL Number already exists. Please use a different number.',
+                    'errors' => ['bol_number' => ['This BOL number is already in use.']]
+                ], 422);
+            }
+        }
+        
+        // Generate 6-digit random BOL number if not provided
+        if (empty($bolNumber)) {
+            do {
+                $bolNumber = str_pad(rand(100000, 999999), 6, '0', STR_PAD_LEFT);
+                // Check if this number already exists
+                $exists = \App\Models\Shipment::whereNotNull('meta')
+                    ->whereRaw("JSON_EXTRACT(meta, '$.bill_of_lading.bol_number') = ?", [$bolNumber])
+                    ->exists();
+            } while ($exists); // Keep generating until unique
+        }
+
+        // 4) Store Bill of Lading data in meta
         $bolData = [
+            'bol_number' => $bolNumber,
             'carrier_name' => $v['carrier_name'] ?? null,
             'carrier_phone' => $v['carrier_phone'] ?? null,
             'carrier_address' => $v['carrier_address'] ?? null,
@@ -1496,7 +1528,7 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
             'freight_charge_terms' => $v['freight_charge_terms'] ?? 'Freight Charges Are Prepaid',
         ];
 
-        // 4) Handle logo uploads
+        // 5) Handle logo uploads
         if ($request->hasFile('company_logo')) {
             $logo = $request->file('company_logo');
             $logoName = 'bol_company_' . $shipment->id . '_' . time() . '.' . $logo->getClientOriginalExtension();
@@ -1511,15 +1543,15 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
             $bolData['third_party_logo'] = 'uploads/bill-of-lading/' . $logoName;
         }
 
-        // 5) Merge into meta
+        // 6) Merge into meta
         $metaData['bill_of_lading'] = $bolData;
 
-        // 6) Save to database
+        // 7) Save to database
         DB::transaction(function () use ($shipment, $metaData) {
             $shipment->update(['meta' => json_encode($metaData)]);
         });
 
-        // 7) Return JSON for AJAX or redirect
+        // 8) Return JSON for AJAX or redirect
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -1531,6 +1563,28 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
         return redirect()
             ->route('shipment.bill-of-lading', $shipment->id)
             ->with('message', 'Bill of Lading information saved successfully.');
+    }
+
+    public function shipmentBillOfLadingCheck(Request $request, \App\Models\Shipment $shipment)
+    {
+        $bolNumber = $request->input('bol_number');
+        
+        if (empty($bolNumber) || !preg_match('/^\d{6}$/', $bolNumber)) {
+            return response()->json([
+                'available' => false,
+                'message' => 'BOL number must be exactly 6 digits'
+            ]);
+        }
+        
+        $exists = \App\Models\Shipment::where('id', '!=', $shipment->id)
+            ->whereNotNull('meta')
+            ->whereRaw("JSON_EXTRACT(meta, '$.bill_of_lading.bol_number') = ?", [$bolNumber])
+            ->exists();
+        
+        return response()->json([
+            'available' => !$exists,
+            'message' => $exists ? 'This BOL number already exists' : 'Available'
+        ]);
     }
 
     public function shipmentBillOfLading(Request $request, \App\Models\Shipment $shipment)
@@ -1595,18 +1649,64 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
             $thirdPartyLogo = asset($thirdPartyLogo);
         }
         
-        // Generate BOL Number (using shipment ID or reference)
-        $bolNumber = $shipment->reference_no ?? str_pad($shipment->id, 7, '0', STR_PAD_LEFT);
+        // Get BOL Number from saved data or generate (6 digits random)
+        $bolNumber = $bolData['bol_number'] ?? null;
+        if (empty($bolNumber)) {
+            // Generate 6-digit random BOL number if not saved
+            do {
+                $bolNumber = str_pad(rand(100000, 999999), 6, '0', STR_PAD_LEFT);
+                // Check if this number already exists
+                $exists = \App\Models\Shipment::where('id', '!=', $shipment->id)
+                    ->whereNotNull('meta')
+                    ->whereRaw("JSON_EXTRACT(meta, '$.bill_of_lading.bol_number') = ?", [$bolNumber])
+                    ->exists();
+            } while ($exists); // Keep generating until unique
+        }
         
         // Generate Pro Number if not provided
         if (empty($proNumber)) {
             $proNumber = str_pad($shipment->id, 9, '0', STR_PAD_LEFT);
         }
         
+        // Get company info from GeneralSetting and Warehouse
+        $companyName = $generalSetting->site_title ?? 'EZ-SOLUTIONS';
+        $companyPhone = $generalSetting->phone ?? '';
+        $companyFax = $generalSetting->fax ?? '';
+        
+        // Get company address from shipment warehouse or first warehouse
+        $companyAddress = '';
+        if ($shipment->warehouse_id) {
+            $warehouse = \App\Models\Warehouse::find($shipment->warehouse_id);
+            if ($warehouse && $warehouse->address) {
+                $companyAddress = $warehouse->address;
+                if ($warehouse->company) {
+                    $companyAddress = $warehouse->company . "\n" . $companyAddress;
+                }
+            }
+        }
+        if (empty($companyAddress)) {
+            $warehouse = \App\Models\Warehouse::where('is_active', true)->first();
+            if ($warehouse && $warehouse->address) {
+                $companyAddress = $warehouse->address;
+                if ($warehouse->company) {
+                    $companyAddress = $warehouse->company . "\n" . $companyAddress;
+                }
+            }
+        }
+        
+        // Format pickup date
+        $pickupDateFormatted = $pickupDate ? date('m/d/y', strtotime($pickupDate)) : date('m/d/y');
+        
         $data = [
             'shipment_id' => $shipment->id,
             'bol_number' => $bolNumber,
             'pro_number' => $proNumber,
+            'general_setting' => $generalSetting,
+            'company_name' => $companyName,
+            'company_address' => $companyAddress,
+            'company_phone' => $companyPhone,
+            'company_fax' => $companyFax,
+            'pickup_date' => $pickupDateFormatted,
             
             'carrier' => [
                 'name' => $carrierName,
@@ -1619,6 +1719,10 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
                 'account' => $thirdPartyAccount,
                 'address' => $thirdPartyAddress,
             ],
+            
+            'pickup_date' => $pickupDate,
+            'ready_time' => $readyTime,
+            'closing_time' => $closingTime,
             
             'logos' => [
                 'company_logo' => $companyLogo,
@@ -2138,6 +2242,51 @@ public function shipmentLabelCreate(Request $request, Shipment $shipment)
 
             ProductPurchase::create($product_purchase);
         }
+
+        // ================= Create Log with Status Name and Comments =================
+        $statusMap = [
+            1 => 'Received',
+            2 => 'Partial',
+            3 => 'Pending',
+            4 => 'Ordered',
+            5 => 'In Process',
+            6 => 'Cancel',
+            7 => 'Complete'
+        ];
+        
+        $logData = [
+            'status' => $lims_purchase_data->status,
+            'status_name' => $statusMap[$lims_purchase_data->status] ?? 'Unknown',
+        ];
+        
+        if ($lims_purchase_data->comments) {
+            $logData['comments'] = $lims_purchase_data->comments;
+        }
+        
+        // Add other important fields
+        if ($lims_purchase_data->warehouse_id) {
+            $warehouse = Warehouse::find($lims_purchase_data->warehouse_id);
+            $logData['warehouse'] = $warehouse ? $warehouse->name : $lims_purchase_data->warehouse_id;
+        }
+        if ($lims_purchase_data->customer_id) {
+            $customer = Customer::find($lims_purchase_data->customer_id);
+            $logData['customer'] = $customer ? $customer->name : $lims_purchase_data->customer_id;
+        }
+        if ($lims_purchase_data->supplier_id) {
+            $supplier = Supplier::find($lims_purchase_data->supplier_id);
+            $logData['supplier'] = $supplier ? $supplier->name : $lims_purchase_data->supplier_id;
+        }
+        
+        $logData['reference_no'] = $lims_purchase_data->reference_no;
+        $logData['po_no'] = $lims_purchase_data->po_no;
+        $logData['grand_total'] = $lims_purchase_data->grand_total;
+        
+        product_purchase_log::create([
+            'purchase_id' => $lims_purchase_data->id,
+            'user_id'     => Auth::id(),
+            'notes'       => json_encode(['header' => $logData], JSON_UNESCAPED_UNICODE),
+            'created_at'  => now(),
+        ]);
 
         DB::commit();
         return redirect('purchases')->with('message', __('db.Purchase created successfully'));
@@ -2834,6 +2983,7 @@ private function imeiExists(string $imei, int $productId): bool
         }
 
         $q = Purchase::whereDate('created_at', '>=' ,$request->input('starting_date'))->whereDate('created_at', '<=' ,$request->input('ending_date'));
+        
         //check staff access
         $this->staffAccessCheck($q);
         if ($isCustomer) {
@@ -4601,8 +4751,8 @@ private function getShipmentStatusText($status)
     }
 
     // ---------------- Normalize header ----------------
-    $defaultCreatedAt = $purchase->created_at instanceof Carbon ? $purchase->created_at : Carbon::now();
-    $data['created_at'] = $this->normalizeDateTime($data['created_at'] ?? null, $defaultCreatedAt);
+    // Preserve original created_at - don't update it
+    unset($data['created_at']); // Remove created_at from update data to preserve original value
     $data['customer_id'] = $request->input('customer_id', $purchase->customer_id);
 
     $balance = (float)($data['grand_total'] ?? 0) - (float)($data['paid_amount'] ?? 0);
@@ -4900,6 +5050,20 @@ private function getShipmentStatusText($status)
         }
 
         // ================= Build DIFFS (ONLY CHANGES) =================
+        // Status name mapping function
+        $getStatusName = function($status) {
+            $statusMap = [
+                1 => 'Received',
+                2 => 'Partial',
+                3 => 'Pending',
+                4 => 'Ordered',
+                5 => 'In Process',
+                6 => 'Cancel',
+                7 => 'Complete'
+            ];
+            return $statusMap[$status] ?? 'Unknown';
+        };
+
         // HEADER DIFF
         $newHeader = $purchase->getAttributes();
         $headerDiff = [];
@@ -4912,6 +5076,11 @@ private function getShipmentStatusText($status)
                 case 'warehouse_id': $headerDiff['warehouse'] = $idToName('warehouse_id', $v); break;
                 case 'customer_id' : $headerDiff['customer']  = $idToName('customer_id',  $v); break;
                 case 'biller_id'   : $headerDiff['biller']    = $idToName('biller_id',    $v); break;
+                case 'status'      : 
+                    $headerDiff['status'] = $v; 
+                    $headerDiff['status_name'] = $getStatusName($v); 
+                    break;
+                case 'comments'    : $headerDiff['comments'] = $v; break;
                 default            : $headerDiff[$k] = $v; break;
             }
         }
@@ -4992,7 +5161,7 @@ private function getShipmentStatusText($status)
                 'purchase_id' => $purchase->id,
                 'user_id'     => Auth::id(),
                 'notes'       => json_encode([
-                    'header' => $headerDiff,   // only changed header fields
+                    'header' => $headerDiff,   // only changed header fields (includes status_name and comments)
                     'lines'  => $linesDiff,    // only changed line fields
                 ], JSON_UNESCAPED_UNICODE),
                 'created_at'  => now(),

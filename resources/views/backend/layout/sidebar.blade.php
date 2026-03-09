@@ -65,7 +65,7 @@
                 $purchase_shipment_list_permission = $role_has_permissions_list->where('name', 'purchase-shipment-list')->first();
                 ?>
                 @if($purchase_shipment_list_permission)
-               <li id="purchaseShipment-menu"><a href="{{route('backend.purchase.shippedview')}}">{{__('Purchase Shipment list')}}</a></li>
+               <li id="purchaseShipment-menu"><a href="{{route('backend.purchase.shippedview')}}">{{__('Vendor Direct Shipments')}}</a></li>
                 @endif
             </ul>
             </li>

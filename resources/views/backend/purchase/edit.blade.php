@@ -278,10 +278,14 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
     }
     }
     if($product_data->tax_method == 1){
-    $product_cost = ($product_purchase->net_unit_cost + ($product_purchase->discount / $product_purchase->qty)) / $unit_operation_value[0];
+        $qty = $product_purchase->qty > 0 ? $product_purchase->qty : 1;
+        $unit_op_value = isset($unit_operation_value[0]) && $unit_operation_value[0] > 0 ? $unit_operation_value[0] : 1;
+        $product_cost = ($product_purchase->net_unit_cost + ($product_purchase->discount / $qty)) / $unit_op_value;
     }
     else{
-    $product_cost = (($product_purchase->total + ($product_purchase->discount / $product_purchase->qty)) / $product_purchase->qty) / $unit_operation_value[0];
+        $qty = $product_purchase->qty > 0 ? $product_purchase->qty : 1;
+        $unit_op_value = isset($unit_operation_value[0]) && $unit_operation_value[0] > 0 ? $unit_operation_value[0] : 1;
+        $product_cost = (($product_purchase->total + ($product_purchase->discount / $qty)) / $qty) / $unit_op_value;
     }
 
 
@@ -535,206 +539,256 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
     </table>
     </div>
 
-    <div class="container-fluid">
-        <h3>Log History</h3> 
-  <table class="table table-bordered table-condensed" style="width:100%;">
-  <thead>
-    <tr>
-      <th style="width:140px;">User</th>
-      <th>Notes</th>
-      <th style="width:170px;">Created at</th>
-    </tr>
-  </thead>
-  <tbody>
-    @foreach($product_purchase_log as $val)
-      @php
-        $userName = $val->user->name ?? ($val->customer->name ?? 'Unknown');
-        $roleId   = $val->user->role_id ?? null;
-        $notes    = is_array($val->notes) ? $val->notes : json_decode($val->notes, true);
-
-        // helper: title case label
-        $pretty = function($k){
-            $k = str_replace(['_id','Id'], '', (string)$k);
-            return \Illuminate\Support\Str::title(str_replace('_',' ', $k));
-        };
-
-        // helper: array list check (php 7/8 compatible)
-        $isList = function($arr){
-            if (!is_array($arr)) return false;
-            return array_keys($arr) === range(0, count($arr) - 1);
-        };
-
-        // helper: value render
-        $valToStr = function($v){
-            if (is_array($v)) return implode(', ', array_map(fn($x)=> is_array($x)? json_encode($x) : $x, $v));
-            return $v;
-        };
-      @endphp
-      <tr>
-        <td>
-          <span class="badge {{ $roleId == 1 ? 'badge-success' : 'badge-warning' }}">{{ $userName }}</span>
-        </td>
-
-        <td>
-          @if(is_array($notes))
-            {{-- HEADER TABLE --}}
-            @php $header = $notes['header'] ?? []; @endphp
-            @if(!empty($header))
-              <div class="mb-2">
-                <strong>Header changes</strong>
-                <table class="table table-sm table-striped mb-2" style="width:auto; min-width:360px;">
-                  <thead>
-                    <tr>
-                      <th style="width:220px;">Field</th>
-                      <th>Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                  @if($isList($header))
-                    {{-- shape: [{field,label,value}] --}}
-                    @foreach($header as $h)
-                      @php
-                        $label = $h['label'] ?? $pretty($h['field'] ?? '');
-                        $valx  = $h['value'] ?? null;
-                      @endphp
-                      <tr>
-                        <td>{{ $label }}</td>
-                        <td>{{ $valToStr($valx) }}</td>
-                      </tr>
-                    @endforeach
-                  @else
-                    {{-- shape: {"total_discount":"0.00", ...} --}}
-                    @foreach($header as $k => $v)
-                      <tr>
-                        <td>{{ $pretty($k) }}</td>
-                        <td>{{ $valToStr($v) }}</td>
-                      </tr>
-                    @endforeach
-                  @endif
-                  </tbody>
-                </table>
-              </div>
-            @endif
-
-            {{-- LINES SECTION --}}
-            @php $lines = $notes['lines'] ?? []; @endphp
-            @if(!empty($lines))
-              <div>
-                <strong>Line changes</strong>
-
-                {{-- MODIFIED --}}
-                @if(!empty($lines['modified']))
-                  @foreach($lines['modified'] as $row)
-                    @php
-                      $prod = $row['product'] ?? ('#'.($row['product_id'] ?? ''));
-                      $chg  = $row['changes'] ?? [];
-                    @endphp
-                    <div class="mt-2">
-                      <em>{{ $prod }}</em>
-                      <table class="table table-sm table-striped mb-2" style="width:auto; min-width:360px;">
-                        <thead>
-                          <tr>
-                            <th style="width:220px;">Field</th>
-                            <th>New value</th>
-                          </tr>
+    <div class="container-fluid mt-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fa fa-history"></i> Purchase Log History</h4>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" style="width:100%;">
+                        <thead class="thead-light">
+                            <tr>
+                                <th style="width:150px;">User</th>
+                                <th>Changes</th>
+                                <th style="width:180px;">Date & Time</th>
+                            </tr>
                         </thead>
                         <tbody>
-                          @if($isList($chg))
-                            {{-- shape: [{field,label,value}] --}}
-                            @foreach($chg as $c)
-                              @php
-                                $label = $c['label'] ?? $pretty($c['field'] ?? '');
-                                $valx  = $c['value'] ?? null;
-                              @endphp
-                              <tr>
-                                <td>{{ $label }}</td>
-                                <td>{{ $valToStr($valx) }}</td>
-                              </tr>
+                            @foreach($product_purchase_log as $val)
+                                @php
+                                    $userName = $val->user->name ?? ($val->customer->name ?? 'Unknown');
+                                    $roleId   = $val->user->role_id ?? null;
+                                    $notes    = is_array($val->notes) ? $val->notes : json_decode($val->notes, true);
+
+                                    // helper: title case label
+                                    $pretty = function($k){
+                                        $k = str_replace(['_id','Id'], '', (string)$k);
+                                        return \Illuminate\Support\Str::title(str_replace('_',' ', $k));
+                                    };
+
+                                    // helper: array list check (php 7/8 compatible)
+                                    $isList = function($arr){
+                                        if (!is_array($arr)) return false;
+                                        return array_keys($arr) === range(0, count($arr) - 1);
+                                    };
+
+                                    // helper: value render
+                                    $valToStr = function($v){
+                                        if (is_array($v)) return implode(', ', array_map(fn($x)=> is_array($x)? json_encode($x) : $x, $v));
+                                        return $v;
+                                    };
+                                    
+                                    // Status badge colors
+                                    $statusBadge = function($status) {
+                                        $badges = [
+                                            1 => 'badge-success',  // Received
+                                            2 => 'badge-info',      // Partial
+                                            3 => 'badge-warning',  // Pending
+                                            4 => 'badge-primary',  // Ordered
+                                            5 => 'badge-secondary', // In Process
+                                            6 => 'badge-danger',   // Cancel
+                                            7 => 'badge-success'   // Complete
+                                        ];
+                                        return $badges[$status] ?? 'badge-secondary';
+                                    };
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="badge {{ $roleId == 1 ? 'badge-success' : 'badge-warning' }} mb-1">{{ $userName }}</span>
+                                            <small class="text-muted">{{ $val->created_at ? \Carbon\Carbon::parse($val->created_at)->format('M d, Y') : '' }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if(is_array($notes))
+                                            {{-- HEADER TABLE --}}
+                                            @php $header = $notes['header'] ?? []; @endphp
+                                            @if(!empty($header))
+                                                <div class="mb-3">
+                                                    <h6 class="text-primary mb-2"><i class="fa fa-file-text"></i> Header Changes</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-bordered mb-2" style="width:100%; font-size:12px;">
+                                                            <thead class="thead-light">
+                                                                <tr>
+                                                                    <th style="width:200px;">Field</th>
+                                                                    <th>Value</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @if($isList($header))
+                                                                    @foreach($header as $h)
+                                                                        @php
+                                                                            $label = $h['label'] ?? $pretty($h['field'] ?? '');
+                                                                            $valx  = $h['value'] ?? null;
+                                                                        @endphp
+                                                                        <tr>
+                                                                            <td><strong>{{ $label }}</strong></td>
+                                                                            <td>
+                                                                                @if($h['field'] == 'status' && isset($h['status_name']))
+                                                                                    <span class="badge {{ $statusBadge($valx) }}">{{ $h['status_name'] }}</span>
+                                                                                @else
+                                                                                    {{ $valToStr($valx) }}
+                                                                                @endif
+                                                                            </td>
+                                                                        </tr>
+                                                                    @endforeach
+                                                                @else
+                                                                    @foreach($header as $k => $v)
+                                                                        @if($k == 'status_name')
+                                                                            {{-- Skip status_name field, it's shown with status --}}
+                                                                        @else
+                                                                            <tr>
+                                                                                <td><strong>{{ $pretty($k) }}</strong></td>
+                                                                                <td>
+                                                                                    @if($k == 'status' && isset($header['status_name']))
+                                                                                        <span class="badge {{ $statusBadge($v) }}">{{ $header['status_name'] }}</span>
+                                                                                    @elseif($k == 'comments')
+                                                                                        <div class="alert alert-info mb-0 p-2" style="font-size:12px;">{{ $v }}</div>
+                                                                                    @else
+                                                                                        {{ $valToStr($v) }}
+                                                                                    @endif
+                                                                                </td>
+                                                                            </tr>
+                                                                        @endif
+                                                                    @endforeach
+                                                                @endif
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            @endif
+
+                                            {{-- LINES SECTION --}}
+                                            @php $lines = $notes['lines'] ?? []; @endphp
+                                            @if(!empty($lines))
+                                                <div class="mt-3">
+                                                    <h6 class="text-info mb-2"><i class="fa fa-list"></i> Line Item Changes</h6>
+
+                                                    {{-- MODIFIED --}}
+                                                    @if(!empty($lines['modified']))
+                                                        @foreach($lines['modified'] as $row)
+                                                            @php
+                                                                $prod = $row['product'] ?? ('#'.($row['product_id'] ?? ''));
+                                                                $chg  = $row['changes'] ?? [];
+                                                            @endphp
+                                                            <div class="mb-3">
+                                                                <strong class="text-warning"><i class="fa fa-edit"></i> {{ $prod }}</strong>
+                                                                <div class="table-responsive mt-1">
+                                                                    <table class="table table-sm table-bordered" style="font-size:12px;">
+                                                                        <thead class="thead-light">
+                                                                            <tr>
+                                                                                <th style="width:200px;">Field</th>
+                                                                                <th>New Value</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            @if($isList($chg))
+                                                                                @foreach($chg as $c)
+                                                                                    @php
+                                                                                        $label = $c['label'] ?? $pretty($c['field'] ?? '');
+                                                                                        $valx  = $c['value'] ?? null;
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td><strong>{{ $label }}</strong></td>
+                                                                                        <td>{{ $valToStr($valx) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            @else
+                                                                                @foreach($chg as $k => $v)
+                                                                                    <tr>
+                                                                                        <td><strong>{{ $pretty($k) }}</strong></td>
+                                                                                        <td>{{ $valToStr($v) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    @endif
+
+                                                    {{-- ADDED --}}
+                                                    @if(!empty($lines['added']))
+                                                        @foreach($lines['added'] as $row)
+                                                            @php
+                                                                $prod = $row['product'] ?? ('#'.($row['product_id'] ?? ''));
+                                                                $vals = $row['values'] ?? [];
+                                                            @endphp
+                                                            <div class="mb-3">
+                                                                <strong class="text-success"><i class="fa fa-plus-circle"></i> {{ $prod }} <span class="badge badge-success">Added</span></strong>
+                                                                <div class="table-responsive mt-1">
+                                                                    <table class="table table-sm table-bordered" style="font-size:12px;">
+                                                                        <thead class="thead-light">
+                                                                            <tr>
+                                                                                <th style="width:200px;">Field</th>
+                                                                                <th>Value</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            @if($isList($vals))
+                                                                                @foreach($vals as $c)
+                                                                                    @php
+                                                                                        $label = $c['label'] ?? $pretty($c['field'] ?? '');
+                                                                                        $valx  = $c['value'] ?? null;
+                                                                                    @endphp
+                                                                                    <tr>
+                                                                                        <td><strong>{{ $label }}</strong></td>
+                                                                                        <td>{{ $valToStr($valx) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            @else
+                                                                                @foreach($vals as $k => $v)
+                                                                                    <tr>
+                                                                                        <td><strong>{{ $pretty($k) }}</strong></td>
+                                                                                        <td>{{ $valToStr($v) }}</td>
+                                                                                    </tr>
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    @endif
+
+                                                    {{-- REMOVED --}}
+                                                    @if(!empty($lines['removed']))
+                                                        <div class="mb-3">
+                                                            <strong class="text-danger"><i class="fa fa-trash"></i> Removed Items</strong>
+                                                            <ul class="list-group mt-2">
+                                                                @foreach($lines['removed'] as $row)
+                                                                    <li class="list-group-item list-group-item-danger">
+                                                                        {{ $row['product'] ?? ('#'.($row['product_id'] ?? '')) }}
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @else
+                                            {{-- Fallback: plain string --}}
+                                            <div class="alert alert-secondary">
+                                                <pre style="font-size:11px; margin:0; white-space: pre-wrap;">{{ json_encode($notes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div class="text-center">
+                                            <small class="text-muted d-block">{{ $val->created_at ? \Carbon\Carbon::parse($val->created_at)->format('M d, Y') : '' }}</small>
+                                            <small class="text-muted">{{ $val->created_at ? \Carbon\Carbon::parse($val->created_at)->format('H:i A') : '' }}</small>
+                                        </div>
+                                    </td>
+                                </tr>
                             @endforeach
-                          @else
-                            {{-- shape: {"batch_no":"9","moq":"$i",...} --}}
-                            @foreach($chg as $k => $v)
-                              <tr>
-                                <td>{{ $pretty($k) }}</td>
-                                <td>{{ $valToStr($v) }}</td>
-                              </tr>
-                            @endforeach
-                          @endif
                         </tbody>
-                      </table>
-                    </div>
-                  @endforeach
-                @endif
-
-                {{-- ADDED --}}
-                @if(!empty($lines['added']))
-                  @foreach($lines['added'] as $row)
-                    @php
-                      $prod = $row['product'] ?? ('#'.($row['product_id'] ?? ''));
-                      $vals = $row['values'] ?? [];
-                    @endphp
-                    <div class="mt-2">
-                      <em>{{ $prod }}</em> <span class="text-muted">(Added)</span>
-                      <table class="table table-sm table-striped mb-2" style="width:auto; min-width:360px;">
-                        <thead>
-                          <tr>
-                            <th style="width:220px;">Field</th>
-                            <th>Value</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @if($isList($vals))
-                            {{-- shape: [{field,label,value}] --}}
-                            @foreach($vals as $c)
-                              @php
-                                $label = $c['label'] ?? $pretty($c['field'] ?? '');
-                                $valx  = $c['value'] ?? null;
-                              @endphp
-                              <tr>
-                                <td>{{ $label }}</td>
-                                <td>{{ $valToStr($valx) }}</td>
-                              </tr>
-                            @endforeach
-                          @else
-                            {{-- shape: {"qty":1,"batch_no":"9",...} --}}
-                            @foreach($vals as $k => $v)
-                              <tr>
-                                <td>{{ $pretty($k) }}</td>
-                                <td>{{ $valToStr($v) }}</td>
-                              </tr>
-                            @endforeach
-                          @endif
-                        </tbody>
-                      </table>
-                    </div>
-                  @endforeach
-                @endif
-
-                {{-- REMOVED --}}
-                @if(!empty($lines['removed']))
-                  <div class="mt-2">
-                    <em>Removed lines</em>
-                    <ul class="mb-2" style="margin-left:18px;">
-                      @foreach($lines['removed'] as $row)
-                        <li>{{ $row['product'] ?? ('#'.($row['product_id'] ?? '')) }}</li>
-                      @endforeach
-                    </ul>
-                  </div>
-                @endif
-              </div>
-            @endif
-
-          @else
-            {{-- Fallback: plain string --}}
-            {{ $val->notes }}
-          @endif
-        </td>
-
-        <td>{{ $val->created_at }}</td>
-      </tr>
-    @endforeach
-  </tbody>
-</table>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 
   
     </table>
@@ -1018,7 +1072,8 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
     $('input[name="edit_discount"]').val(num(product_discount[rowindex]).toFixed(DEC));
 
     unitConversion();
-    $('input[name="edit_unit_cost"]').val(f(row_product_cost));
+    var display_cost = (row_product_cost && !isNaN(row_product_cost)) ? row_product_cost : 0;
+    $('input[name="edit_unit_cost"]').val(f(display_cost));
 
     var tax_name_all = <?php echo json_encode($tax_name_all) ?>;
     var pos = tax_name_all.indexOf(tax_name[rowindex]);
@@ -1077,17 +1132,19 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
     if (edit_discount > edit_unit_cost) { alert('Invalid Discount Input!'); return; }
     if (edit_qty < 1) { $('input[name="edit_qty"]').val(1); edit_qty = 1; alert("Quantity can't be less than 1"); }
 
-    var row_unit_operator = unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(","));
-    var row_unit_operation_value = num(unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")));
+    var row_unit_operator = unit_operator[rowindex] ? unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(",")) : '*';
+    var row_unit_operation_value = parseFloat(unit_operation_value[rowindex] ? unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")) : '1') || 1;
     var tax_rate_all = <?php echo json_encode($tax_rate_all) ?>;
 
     tax_rate[rowindex] = num(tax_rate_all[$('select[name="edit_tax_rate"]').val()]);
     tax_name[rowindex] = $('select[name="edit_tax_rate"] option:selected').text();
 
-    // base unit product cost store back
-    product_cost[rowindex] = (row_unit_operator == '*')
-      ? (edit_unit_cost / row_unit_operation_value)
-      : (edit_unit_cost * row_unit_operation_value);
+    // base unit product cost store back (with division by zero check)
+    if (row_unit_operator == '*') {
+      product_cost[rowindex] = row_unit_operation_value > 0 ? (edit_unit_cost / row_unit_operation_value) : edit_unit_cost;
+    } else {
+      product_cost[rowindex] = edit_unit_cost * row_unit_operation_value;
+    }
 
     product_discount[rowindex] = edit_discount;
 
@@ -1161,10 +1218,15 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
   }
 
   function unitConversion() {
-    var row_unit_operator = unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(","));
-    var row_unit_operation_value = num(unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")));
-    if (row_unit_operator == '*') row_product_cost = product_cost[rowindex] * row_unit_operation_value;
-    else row_product_cost = product_cost[rowindex] / row_unit_operation_value;
+    var row_unit_operator = unit_operator[rowindex] ? unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(",")) : '*';
+    var row_unit_operation_value = parseFloat(unit_operation_value[rowindex] ? unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")) : '1') || 1;
+    var prodCost = parseFloat(product_cost[rowindex]) || 0;
+    
+    if (row_unit_operator == '*') {
+      row_product_cost = prodCost * row_unit_operation_value;
+    } else {
+      row_product_cost = row_unit_operation_value > 0 ? (prodCost / row_unit_operation_value) : prodCost;
+    }
   }
 
   function calculateRowProductData(quantity) {
@@ -1184,8 +1246,8 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
       $tr.find('.discount').text(f(discTotal));
       $tr.find('.discount-value').val(f(discTotal));
       $tr.find('.tax-rate').val(f(tRate));
-      $tr.find('.net_unit_cost_cell').text(f(net_unit_cost));
-      $tr.find('.net_unit_cost_input').val(f(net_unit_cost));
+      $tr.find('.net_unit_cost_cell, .net_unit_cost').text(f(net_unit_cost));
+      $tr.find('.net_unit_cost_input, .net_unit_cost').val(f(net_unit_cost));
       $tr.find('.tax').text(f(tax));
       $tr.find('.tax-value').val(f(tax));
       $tr.find('.sub-total').text(f(sub_total));
@@ -1199,8 +1261,8 @@ $product_data = DB::table('products')->find($product_purchase->product_id);
       $tr.find('.discount').text(f(discTotal));
       $tr.find('.discount-value').val(f(discTotal));
       $tr.find('.tax-rate').val(f(tRate));
-      $tr.find('.net_unit_cost_cell').text(f(net_unit_cost));
-      $tr.find('.net_unit_cost_input').val(f(net_unit_cost));
+      $tr.find('.net_unit_cost_cell, .net_unit_cost').text(f(net_unit_cost));
+      $tr.find('.net_unit_cost_input, .net_unit_cost').val(f(net_unit_cost));
       $tr.find('.tax').text(f(tax));
       $tr.find('.tax-value').val(f(tax));
       $tr.find('.sub-total').text(f(sub_total));

@@ -878,15 +878,15 @@
           $("table.order-list tbody").prepend(newRow);
           rowindex = newRow.index();
 
-          product_cost.splice(rowindex,0, parseFloat(data[2]));
-          product_discount.splice(rowindex,0, '{{ number_format(0, $general_setting->decimal, ".", "") }}');
-          tax_rate.splice(rowindex,0, parseFloat(data[3]));
-          tax_name.splice(rowindex,0, data[4]);
-          tax_method.splice(rowindex,0, data[5]);
-          unit_name.splice(rowindex,0, data[6]);
-          unit_operator.splice(rowindex,0, data[7]);
-          unit_operation_value.splice(rowindex,0, data[8]);
-          is_imei.splice(rowindex, 0, data[11]);
+          product_cost.splice(rowindex,0, parseFloat(data[2]) || 0);
+          product_discount.splice(rowindex,0, 0);
+          tax_rate.splice(rowindex,0, parseFloat(data[3]) || 0);
+          tax_name.splice(rowindex,0, data[4] || 'No Tax');
+          tax_method.splice(rowindex,0, parseFloat(data[5]) || 1);
+          unit_name.splice(rowindex,0, data[6] || '');
+          unit_operator.splice(rowindex,0, data[7] || '*');
+          unit_operation_value.splice(rowindex,0, data[8] || '1');
+          is_imei.splice(rowindex, 0, data[11] || 0);
 
           checkQuantity(1, true);
           if(data[11]) {
@@ -906,26 +906,39 @@
       $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.recieved').val(purchase_qty);
     else
       $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.recieved').val(0);
-    if(flag)
-      product_cost[rowindex] = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.original-cost').val() * exchangeRate;
+    if(flag) {
+      var originalCost = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.original-cost').val()) || 0;
+      var exRate = parseFloat(exchangeRate) || 1;
+      product_cost[rowindex] = originalCost * exRate;
+    }
     calculateRowProductData(purchase_qty);
   }
 
   function calculateRowProductData(quantity) {
     unitConversion();
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{ $general_setting->decimal }}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{ $general_setting->decimal }}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{ $general_setting->decimal }}));
+    
+    // Ensure all values are numbers
+    var qty = parseFloat(quantity) || 0;
+    var disc = parseFloat(product_discount[rowindex]) || 0;
+    var taxRate = parseFloat(tax_rate[rowindex]) || 0;
+    var taxMethod = parseFloat(tax_method[rowindex]) || 1;
+    var rowProductCost = parseFloat(row_product_cost) || 0;
+    
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((disc * qty).toFixed({{ $general_setting->decimal }}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((disc * qty).toFixed({{ $general_setting->decimal }}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(taxRate.toFixed({{ $general_setting->decimal }}));
 
-    if (tax_method[rowindex] == 1) {
-      var net_unit_cost = row_product_cost - product_discount[rowindex];
-      var tax = net_unit_cost * quantity * (tax_rate[rowindex] / 100);
-      var sub_total = (net_unit_cost * quantity) + tax;
+    var net_unit_cost, tax, sub_total;
+    
+    if (taxMethod == 1) {
+      net_unit_cost = rowProductCost - disc;
+      tax = net_unit_cost * qty * (taxRate / 100);
+      sub_total = (net_unit_cost * qty) + tax;
     } else {
-      var sub_total_unit = row_product_cost - product_discount[rowindex];
-      var net_unit_cost = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
-      var tax = (sub_total_unit - net_unit_cost) * quantity;
-      var sub_total = sub_total_unit * quantity;
+      var sub_total_unit = rowProductCost - disc;
+      net_unit_cost = (100 / (100 + taxRate)) * sub_total_unit;
+      tax = (sub_total_unit - net_unit_cost) * qty;
+      sub_total = sub_total_unit * qty;
     }
 
     var $row = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
@@ -940,10 +953,15 @@
   }
 
   function unitConversion() {
-    var row_unit_operator = unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(","));
-    var row_unit_operation_value = parseFloat(unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")));
-    if (row_unit_operator == '*') row_product_cost = product_cost[rowindex] * row_unit_operation_value;
-    else row_product_cost = product_cost[rowindex] / row_unit_operation_value;
+    var row_unit_operator = unit_operator[rowindex] ? unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(",")) : '*';
+    var row_unit_operation_value = parseFloat(unit_operation_value[rowindex] ? unit_operation_value[rowindex].slice(0, unit_operation_value[rowindex].indexOf(",")) : '1') || 1;
+    var prodCost = parseFloat(product_cost[rowindex]) || 0;
+    
+    if (row_unit_operator == '*') {
+      row_product_cost = prodCost * row_unit_operation_value;
+    } else {
+      row_product_cost = row_unit_operation_value > 0 ? (prodCost / row_unit_operation_value) : prodCost;
+    }
   }
 
   function calculateTotal() {

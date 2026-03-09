@@ -862,6 +862,13 @@
             <div class="col-md-6">
               <h6 class="font-weight-bold">Reference Information</h6>
               <div class="form-group">
+                <label>BOL Number <small class="text-muted">(6 digits, Auto-generated if empty)</small></label>
+                <input type="text" name="bol_number" id="bol_number" class="form-control" placeholder="Enter 6 digits (e.g. 123456)" value="{{ $billOfLading['bol_number'] ?? '' }}" maxlength="6" pattern="[0-9]{6}">
+                <small class="text-muted" id="bol_number_hint">Leave empty for auto-generation (6 random digits)</small>
+                <small class="text-danger d-none" id="bol_number_error"></small>
+                <small class="text-success d-none" id="bol_number_success">✓ Available</small>
+              </div>
+              <div class="form-group">
                 <label>Shipper #</label>
                 <input type="text" name="shipper_number" class="form-control" value="{{ $billOfLading['shipper_number'] ?? $shipment->po_no ?? '' }}">
               </div>
@@ -1258,6 +1265,59 @@
 
   // Bill of Lading Form AJAX Submission
   $(document).ready(function() {
+    // BOL Number duplicate check on input
+    let bolCheckTimeout;
+    $('#bol_number').on('input', function() {
+      const $input = $(this);
+      const bolNumber = $input.val().trim();
+      const $hint = $('#bol_number_hint');
+      const $error = $('#bol_number_error');
+      const $success = $('#bol_number_success');
+      
+      // Hide previous messages
+      $error.addClass('d-none');
+      $success.addClass('d-none');
+      
+      // Only check if 6 digits entered
+      if (bolNumber.length === 6 && /^\d{6}$/.test(bolNumber)) {
+        clearTimeout(bolCheckTimeout);
+        $hint.text('Checking availability...');
+        
+        bolCheckTimeout = setTimeout(function() {
+          $.ajax({
+            url: '{{ route("shipment.bill-of-lading.check", $shipment->id) }}',
+            method: 'POST',
+            data: {
+              bol_number: bolNumber,
+              _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+              if (response.available) {
+                $hint.addClass('d-none');
+                $error.addClass('d-none');
+                $success.removeClass('d-none').text('✓ Available');
+                $input.removeClass('is-invalid').addClass('is-valid');
+              } else {
+                $hint.addClass('d-none');
+                $success.addClass('d-none');
+                $error.removeClass('d-none').text('✗ This BOL number already exists');
+                $input.removeClass('is-valid').addClass('is-invalid');
+              }
+            },
+            error: function() {
+              $hint.text('Leave empty for auto-generation (6 random digits)');
+            }
+          });
+        }, 500); // Debounce 500ms
+      } else if (bolNumber.length > 0) {
+        $hint.text('Please enter exactly 6 digits');
+        $input.removeClass('is-valid is-invalid');
+      } else {
+        $hint.text('Leave empty for auto-generation (6 random digits)');
+        $input.removeClass('is-valid is-invalid');
+      }
+    });
+    
     $('#billOfLadingForm').on('submit', function(e) {
       e.preventDefault();
       var $form = $(this);
