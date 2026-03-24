@@ -57,8 +57,6 @@ trait TenantInfo {
             $ecommerceSqlData = fread($ecommerceSql,filesize(public_path("ecommerce_data.sql")));
             fclose($ecommerceSql);
         }
-        if(in_array("woocommerce", $features))
-            $modules[] = "woocommerce";
         if(count($modules))
             $modules = implode(",", $modules);
         else

@@ -90,26 +90,6 @@
             </li>
             @endif
             <?php
-                $woocommerce_index_permission_active = $role_has_permissions_list->where('name', 'woocommerce-index')->first();
-                $woocommerce_add_permission_active = $role_has_permissions_list->where('name', 'woocommerce-add')->first();
-                $woocommerce_api_permission_active = $role_has_permissions_list->where('name', 'woocommerce-api-settings')->first();
-            ?>
-            @if($woocommerce_index_permission_active || $woocommerce_add_permission_active || $woocommerce_api_permission_active)
-            <li><a href="#WooCommerce" aria-expanded="false" data-toggle="collapse"> <i class="fa fa-shopping-cart"></i><span>{{__('WooCommerce Orders')}}</span></a>
-            <ul id="WooCommerce" class="collapse list-unstyled ">
-                @if($woocommerce_index_permission_active)
-                <li id="woocommerce-orders-menu"><a href="{{route('woocommerce.orders.index')}}">{{__('Orders List')}}</a></li>
-                @endif
-                @if($woocommerce_add_permission_active)
-                <li id="woocommerce-create-menu"><a href="{{route('woocommerce.orders.create')}}">{{__('Add Order')}}</a></li>
-                @endif
-                @if($woocommerce_api_permission_active)
-                <li id="woocommerce-api-menu"><a href="{{route('woocommerce.api-settings')}}">{{__('API Settings')}}</a></li>
-                @endif
-            </ul>
-            </li>
-            @endif
-            <?php
                 $sale_index_permission_active = $role_has_permissions_list->where('name', 'sales-index')->first();
 
                 $packing_slip_challan_active = $role_has_permissions_list->where('name', 'packing_slip_challan')->first();
@@ -127,6 +107,7 @@
             <ul id="sale" class="collapse list-unstyled ">
                 @if($sale_index_permission_active)
                 <li id="sale-list-menu"><a href="{{route('sales.index')}}">{{__('db.Sale List')}}</a></li>
+                <li id="website-orders-menu"><a href="{{ route('website-orders.index') }}">Website Orders</a></li>
                 @endif
                 @if($sale_add_permission_active)
                 <li><a href="{{route('sale.pos')}}">POS</a></li>
@@ -599,9 +580,6 @@
                             <li id="production-create-menu"><a href="{{route('productions.create')}}">{{__('db.Add Production')}}</a></li>
                         </ul>
                     </li>
-                    @endif
-                    @if (in_array('woocommerce',explode(',',$general_setting->modules)) && Route::has('woocommerce.index'))
-                        <li><a href="{{route('woocommerce.index')}}"> <i class="fa fa-wordpress"></i><span>WooCommerce</span></a></li>
                     @endif
                     @if(in_array('ecommerce',explode(',',$general_setting->modules)))
                     <li><a href="#ecommerce" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-shopping-bag"></i><span>eCommerce</span></a>

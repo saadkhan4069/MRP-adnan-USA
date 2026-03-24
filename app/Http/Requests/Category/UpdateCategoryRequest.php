@@ -38,7 +38,6 @@ class UpdateCategoryRequest extends FormRequest
             'parent_id' => 'nullable|exists:categories,id',
             'is_active' => 'nullable|boolean',
             'is_sync_disable' => 'nullable|boolean',
-            'woocommerce_category_id' => 'nullable|integer',
             'slug' => [
                 'sometimes',
                 'nullable',

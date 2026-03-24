@@ -115,37 +115,6 @@
                         </div>
                     </td>
                 </tr>
-                <tr>
-                    <td>SalePro{{$isLandlord ? 'SaaS' : ''}} WooCommerce</td>
-                    <td>An addon to integrate SalePro{{$isLandlord ? 'SaaS' : ''}} with your existing WooCommerce website.</td>
-                    <td>
-                        <div class="btn-group">
-                            @php
-                            $woocommerceInstalled = $isLandlord
-                                ? file_exists(base_path('Modules/Woocommerce'))
-                                : in_array('woocommerce', explode(',', $general_setting->modules));
-
-                            $buyNowUrl = $isLandlord
-                                ? 'https://lion-coders.com/software/woocommerce-addon-for-salepro-saas'
-                                : 'https://lion-coders.com/software/salepro-woocommerce-addon';
-                            @endphp
-
-                            @if (!$woocommerceInstalled)
-                                <a target="_blank" href="{{ $buyNowUrl }}" class="btn btn-primary btn-sm" title="Point of sale WooCommerce add-on">
-                                    <i class="dripicons-basket"></i> Buy Now
-                                </a>&nbsp;&nbsp;
-                                <button type="button" class="btn btn-info btn-sm" data-toggle="modal" data-target="#installWooCommerceModal">
-                                    <i class="dripicons-download"></i> Install
-                                </button>
-                            @else
-                                <button type="button" class="btn btn-info btn-sm" data-toggle="modal" data-target="#installWooCommerceModal">
-                                    <i class="dripicons-download"></i> Update
-                                </button>
-                            @endif
-
-                        </div>
-                    </td>
-                </tr>
             </tbody>
         </table>
     </div>
@@ -207,31 +176,6 @@
             {!! Form::open(['route' => ($isLandlord) ? 'saas.api.install' : 'api.install', 'method' => 'post']) !!}
             <div class="modal-header">
                 <h5 class="modal-title">Install API Add-on</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-            </div>
-            <div class="modal-body">
-                <p class="italic"><small>{{__($db_str.'The field labels marked with * are required input fields')}}.</small></p>
-                <form>
-                    <div class="form-group">
-                        <label>Purchase Code *</label>
-                        {{Form::text('purchase_code',null,array('required' => 'required', 'class' => 'form-control', 'placeholder' => __($db_str.'Type purchase code')))}}
-                    </div>
-                    <div class="form-group">
-                        <input type="submit" value="{{__($db_str.'submit')}}" class="btn btn-primary">
-                    </div>
-                </form>
-            </div>
-            {{ Form::close() }}
-        </div>
-    </div>
-</div>
-
-<div id="installWooCommerceModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
-    <div role="document" class="modal-dialog">
-        <div class="modal-content">
-            {!! Form::open(['route' => ($isLandlord) ? 'saas.woocommerce.install' : 'woocommerce.install', 'method' => 'post']) !!}
-            <div class="modal-header">
-                <h5 class="modal-title">Install WooCommerce Add-on</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
             </div>
             <div class="modal-body">

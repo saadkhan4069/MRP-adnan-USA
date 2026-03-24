@@ -852,31 +852,6 @@ class TenantDatabaseSeeder extends Seeder
                     'id' => 149,
                     'name' => 'purchases-import',
                     'guard_name' => 'web',
-                ],
-                [
-                    'id' => 150,
-                    'name' => 'woocommerce-index',
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 151,
-                    'name' => 'woocommerce-add',
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 152,
-                    'name' => 'woocommerce-edit',
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 153,
-                    'name' => 'woocommerce-delete',
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 154,
-                    'name' => 'woocommerce-api-settings',
-                    'guard_name' => 'web',
                 ]
         ];
 
@@ -1252,26 +1227,6 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'permission_id' => 149,
-                    'role_id' => 1,
-                ],
-                [
-                    'permission_id' => 150,
-                    'role_id' => 1,
-                ],
-                [
-                    'permission_id' => 151,
-                    'role_id' => 1,
-                ],
-                [
-                    'permission_id' => 152,
-                    'role_id' => 1,
-                ],
-                [
-                    'permission_id' => 153,
-                    'role_id' => 1,
-                ],
-                [
-                    'permission_id' => 154,
                     'role_id' => 1,
                 ]
             ];

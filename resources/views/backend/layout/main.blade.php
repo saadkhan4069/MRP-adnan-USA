@@ -504,13 +504,6 @@
                 </select>
                 <x-validation-error fieldName="parent_id" />
               </div>
-              @if (\Schema::hasColumn('categories', 'woocommerce_category_id'))
-              <div class="col-md-6 form-group mt-4">
-                <input class="mt-3" name="is_sync_disable" type="checkbox" id="is_sync_disable" value="1">&nbsp; {{ __('Disable Woocommerce Sync') }}
-                <x-validation-error fieldName="is_sync_disable" />
-              </div>
-              @endif
-
               @if(in_array('ecommerce',explode(',',$general_setting->modules)))
               <div class="col-md-12 mt-3">
                 <h6><strong>{{ __('For Website') }}</strong></h6>

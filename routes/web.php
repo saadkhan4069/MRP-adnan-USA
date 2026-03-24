@@ -50,6 +50,7 @@ use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\ReturnPurchaseController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\WebsiteOrderController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\StockCountController;
 use App\Http\Controllers\SupplierController;
@@ -70,8 +71,6 @@ use App\Http\Controllers\TranslationController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\ScheduleController;
-use App\Http\Controllers\WooCommerceController;
-
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -343,6 +342,11 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function() {
     });
     Route::resource('sales', SaleController::class);
 
+    Route::controller(WebsiteOrderController::class)->group(function () {
+        Route::get('website-orders', 'index')->name('website-orders.index');
+        Route::get('website-orders/fetch', 'fetch')->name('website-orders.fetch');
+    });
+
     Route::controller(PackingSlipController::class)->group(function () {
         Route::prefix('packing-slips')->group(function () {
             Route::get('/', 'index')->name('packingSlip.index');
@@ -470,26 +474,6 @@ Route::get('shipment/{shipment}/portal-label-pdf', [PurchaseController::class, '
     ->name('shipment.portal-label-pdf');
 
  // Shipped label routes inside web.php
-
-//--------------------WooCommerce Orders-----------------------------------
-Route::prefix('woocommerce')->name('woocommerce.')->group(function () {
-    // API Settings
-    Route::get('api-settings', [WooCommerceController::class, 'apiSettings'])->name('api-settings');
-    Route::post('api-settings', [WooCommerceController::class, 'storeApiSettings'])->name('api-settings.store');
-    Route::put('api-settings/{id}', [WooCommerceController::class, 'updateApiSettings'])->name('api-settings.update');
-    Route::get('api-settings/{id}/test', [WooCommerceController::class, 'testConnection'])->name('api-settings.test');
-    Route::post('api-settings/{id}/sync', [WooCommerceController::class, 'syncOrders'])->name('api-settings.sync');
-    
-    // Orders
-    Route::get('orders', [WooCommerceController::class, 'index'])->name('orders.index');
-    Route::get('orders/datatable', [WooCommerceController::class, 'ordersDatatable'])->name('orders.datatable');
-    Route::get('orders/create', [WooCommerceController::class, 'create'])->name('orders.create');
-    Route::post('orders', [WooCommerceController::class, 'store'])->name('orders.store');
-    Route::get('orders/{id}', [WooCommerceController::class, 'show'])->name('orders.show');
-    Route::get('orders/{id}/edit', [WooCommerceController::class, 'edit'])->name('orders.edit');
-    Route::put('orders/{id}', [WooCommerceController::class, 'update'])->name('orders.update');
-    Route::delete('orders/{id}', [WooCommerceController::class, 'destroy'])->name('orders.destroy');
-});
 
 //--------------------Catelog-----------------------------------
 Route::get('/products/{product}/catalog/pdf', [CatalogController::class, 'pdf'])
@@ -857,7 +841,6 @@ Route::post('/vendors', [CatalogController::class, 'vendorStore'])->name('vendor
     Route::controller(AddonInstallController::class)->group(function () {
         Route::post('saas-install', 'saasInstall')->name('saas.install');
         Route::post('ecommerce-install','ecommerceInstall')->name('ecommerce.install');
-        Route::post('woocommerce-install','woocommerceInstall')->name('woocommerce.install');
         Route::post('api-install', 'apiInstall')->name('api.install');
     });
 

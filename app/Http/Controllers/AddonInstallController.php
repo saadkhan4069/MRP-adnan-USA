@@ -36,17 +36,6 @@ class AddonInstallController extends Controller
         return $this->addonIstallUnzipMigrateRemoveTempFolder($data, $path, $module);
     }
 
-    public function woocommerceInstall(Request $request)
-    {
-        $data = [
-            'purchase_code' => $request->purchase_code,
-            'product' => (config('database.connections.saleprosaas_landlord')) ? 'saas_wcom' : 'wcom'
-        ];
-        $path = '/Modules/';
-        $module = 'woocommerce';
-        return $this->addonIstallUnzipMigrateRemoveTempFolder($data, $path, $module);
-    }
-
     public function apiInstall(Request $request)
     {
         $data = [
@@ -102,7 +91,7 @@ class AddonInstallController extends Controller
                 }
 
                 if(!config('database.connections.saleprosaas_landlord')) {
-                    if ($module == 'ecommerce' || $module == 'woocommerce') {
+                    if ($module == 'ecommerce') {
                         Artisan::call('module:migrate', ['--force' => true]);
                     }
 
