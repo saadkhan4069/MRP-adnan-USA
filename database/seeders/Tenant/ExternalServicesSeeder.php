@@ -40,7 +40,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'PayPal',
                 'type' => 'payment',
-                'details' => 'Client ID,Client Secret;abcd1234,wxyz5678', // Dummy values; users will update
+                'details' => 'Client ID,Client Secret;YOUR_CLIENT_ID,YOUR_CLIENT_SECRET',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -57,7 +57,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Stripe',
                 'type' => 'payment',
-                'details' => 'Public Key,Private Key;efgh1234,stuv5678', // Dummy values; users will update
+                'details' => 'Public Key,Private Key;YOUR_PUBLIC_KEY,YOUR_PRIVATE_KEY',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -74,7 +74,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Razorpay',
                 'type' => 'payment',
-                'details' => 'Key,Secret;rzp_test_Y4MCcpHfZNU6rR,3Hr7SDqaZ0G5waN0jsLgsiLx', // Dummy values; users will update
+                'details' => 'Key,Secret;YOUR_RAZORPAY_KEY,YOUR_RAZORPAY_SECRET',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -91,7 +91,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Paystack',
                 'type' => 'payment',
-                'details' => 'public_Key,Secret_Key;pk_test_e8d220b7463d64569f0053e78534f38e6b10cf4a,sk_test_6d62cb976e1e0ab43f1e48b2934b0dfc7f32a1fe', // Dummy values; users will update
+                'details' => 'public_Key,Secret_Key;YOUR_PAYSTACK_PUBLIC_KEY,YOUR_PAYSTACK_SECRET_KEY',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -108,7 +108,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Mollie',
                 'type' => 'payment',
-                'details' => 'api_key;test_dHar4XY7LxsDOtmnkVtjNVWXLSlXsM', // Dummy values; users will update
+                'details' => 'api_key;YOUR_MOLLIE_API_KEY',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -125,7 +125,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Xendit',
                 'type' => 'payment',
-                'details' => 'secret_key,callback_token;xnd_development_aKJVKYbc4lHkEjcCLzWLrBsKs6jF6nbM6WaCMfnJerP3JW57CLis553XNRdDU,YPZxND92Mt8tdXntTYIEkRX802onZ5OcdKBUzycebuqYvN4n', // Dummy values; users will update
+                'details' => 'secret_key,callback_token;YOUR_XENDIT_SECRET_KEY,YOUR_XENDIT_CALLBACK_TOKEN',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -142,7 +142,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'bkash',
                 'type' => 'payment',
-                'details' => 'Mode,app_key,app_secret,username,password;sandbox,0vWQuCRGiUX7EPVjQDr0EUAYtc,jcUNPBgbcqEDedNKdvE4G1cAK7D3hCjmJccNPZZBq96QIxxwAMEx,01770618567,D7DaC<*E*eG', // Dummy values; users will update
+                'details' => 'Mode,app_key,app_secret,username,password;sandbox,YOUR_BKASH_APP_KEY,YOUR_BKASH_APP_SECRET,YOUR_BKASH_USERNAME,YOUR_BKASH_PASSWORD',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -159,7 +159,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'sslcommerz',
                 'type' => 'payment',
-                'details' => 'appkey,appsecret;12341234,asdfa23423', // Dummy values; users will update
+                'details' => 'appkey,appsecret;YOUR_SSLCOMMERZ_APP_KEY,YOUR_SSLCOMMERZ_APP_SECRET',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -176,7 +176,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Mpesa',
                 'type' => 'payment',
-                'details' => 'consumer_Key,consumer_Secret;fhfgkj,dtrddhd', // Dummy values; users will update
+                'details' => 'consumer_Key,consumer_Secret;YOUR_MPESA_CONSUMER_KEY,YOUR_MPESA_CONSUMER_SECRET',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -193,7 +193,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Pesapal',
                 'type' => 'payment',
-                'details' => 'Mode,Consumer Key,Consumer Secret;sandbox,qkio1BGGYAXTu2JOfm7XSXNruoZsrqEW,osGQ364R49cXKeOYSpaOnT++rHs=', // Dummy values; users will update
+                'details' => 'Mode,Consumer Key,Consumer Secret;sandbox,YOUR_PESAPAL_CONSUMER_KEY,YOUR_PESAPAL_CONSUMER_SECRET',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),
@@ -210,7 +210,7 @@ class ExternalServicesSeeder extends Seeder
             DB::table('external_services')->insert([
                 'name' => 'Moneipoint',
                 'type' => 'payment',
-                'details' => 'Mode,client_id,client_secret,terminal_serial;sandbox,api-client-3956952-7e1279e2-95d2-45e1-825a-3a28e0a35168,ZtH02Q%jQ$Imcf%W^B%q,C42P008D01909830', // Dummy values; users will update
+                'details' => 'Mode,client_id,client_secret,terminal_serial;sandbox,YOUR_MONEIPOINT_CLIENT_ID,YOUR_MONEIPOINT_CLIENT_SECRET,YOUR_MONEIPOINT_TERMINAL_SERIAL',
                 'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
                 'active' => 1,
                 'created_at' => now(),

@@ -1,6 +1,58 @@
 composer.phar
+composer-setup.php
 /vendor/
 
 # Commit your application's lock file https://getcomposer.org/doc/01-basic-usage.md#commit-your-composer-lock-file-to-version-control
 # You may choose to ignore a library lock file http://getcomposer.org/doc/02-libraries.md#lock-file
 # composer.lock
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Backups and archives
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+
+# Database dumps
+*.sql
+*.sqlite
+*.db
+
+# Laravel storage (logs, sessions, cache, etc.)
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/testing/*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules
+/node_modules/
+
+# Debug and testing
+.phpunit.result.cache
+coverage/
+
+# Temporary files
+*.tmp
+*.temp

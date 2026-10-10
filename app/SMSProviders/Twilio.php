@@ -10,9 +10,9 @@ class Twilio
         $array_post = http_build_query(array(
             'text'=> $data['message'],
             'numbers'=>$data['numbers'],
-            'api_key'=> 'lwbKCGZjMGsbSfKoOWVXvIEK2Mw3siIwtNJ',
-            'password'=> 'Farmer@2018',
-            'from'=> 'FarmerTribe'
+            'api_key'=> env('SMSTODAY_API_KEY', ''),
+            'password'=> env('SMSTODAY_PASSWORD', ''),
+            'from'=> env('SMSTODAY_SENDER_ID', '')
         ));
 
         curl_setopt($ch, CURLOPT_URL,$endpoint);
